@@ -49,6 +49,10 @@ import java.util.LinkedList;
  * gets a chance to run. The advance to Mesa-style semantics is that it is a
  * lot easier to implement.
  */
+
+/*
+This comment is blank
+*/
 public class Condition {
     /**
      * Allocate a new condition variable.
