@@ -1,0 +1,65 @@
+. KThread.join()
+  Here we need to set the current thread to sleep and weak it up when the
+  thread that was called (this) finished executing. In order to do so, we
+  need a new variable to stored the current thread.
+
+  New variables defined:
+    - private KThread threadToJoin
+
+  Specific changes to KThread.join():
+    - Check the thread (this) status is ready.
+    - Check threadToJoin is null.
+    - Set threadToJoin to the current thread.
+    - Let the current thread sleep.
+    - Disable interrupt and restore at the end just like KThread.yield().
+
+  Specific changes to KThread.finish():
+    - If the current thread has the threadToJoin, wake up the threadToJoin
+      by ready().
+
+. Condition2
+  Here we direct use the same implementation as in Condition, except we replace
+  the semaphone operations by the operations of KThread. More specificly,
+  replace P() by sleep and V() by ready. The corretness can be checked by
+  comparing the commands executed in the two situation. Don't forget to disable
+  interrupt and store the interrupt in the similar way as that in Semaphone.
+
+  Changes to Condition2.sleep():
+
+  Changes to Condition2.wake():
+
+  Changes to Condition2.wakeAll():
+
+. Alarm
+  Here we use a waitQueue to store the threads running waitUnitil and wake them
+  up in timerInterrupt. We could realize the sleep-wake of a thread in the
+  similar way as in the implementation of Condition2.
+
+
+. Communicator
+
+. PriorityScheduler
+  The situations that efficientPriority of a thread might change are:
+    - It receives a donation from another thread. Then it should update its own
+      efficientPriority. If its own efficientPriority increase, it continues to
+      donate the priority to the thread that it is waiting for.
+    - It acquires a new sources and its efficientPrioirity should be updated by
+      the maximum of the efficientPriority of the corresponding waitQueue. Note
+      here we don't need to continue to donate the priority since the thread
+      must not be blocked by others.
+    - It release a new sources and its efficentPriority should be recalculated.
+      Similarly to above case, we don't need to update the efficientPriority
+      of other here.
+    - Its priority is changed by setPrioirty. Here we need to recalculate the
+      efficientPrioirty and also update all the efficient prioity of threads
+      affected by its donation.
+
+
+. Some other modification on the original code.
+  - Check the status of the current thread is not running.
+
+. Note
+  - All the check should be use Lib.assertTrue.
+
+. Strange stuff found
+  - The Lock and Semaphore use the waitQueue with priority but Condition not.
