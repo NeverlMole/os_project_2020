@@ -285,7 +285,7 @@ public class KThread {
     idleThread = new KThread(new Runnable() {
       public void run() {
         while (true)
-          yield();
+          KThread.yield();
       }
     });
     idleThread.setName("idle");
