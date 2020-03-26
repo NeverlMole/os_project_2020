@@ -34,11 +34,11 @@
   disable interrupt and restore the interrupt in the similar way as that in
   Semaphore.
 
-  Waiting test in waitingTest:
+  Waiting test in Condition2.waitingTest():
     - Let a thread sleep for condition but not wake up.
     - The purpose is to test whether the sleep actions is correct.
 
-  Join test in joinTest:
+  Join test in Condition2.joinTest():
     - Use condition to realizing join function.
     - Let a father thread fork a son thread and then sleep. Son thread will
       wake the father thread up before finishing.
@@ -62,7 +62,7 @@
     - Wake all the thread in waitingQueue with wakeTime greater than machine
       time before the current thread yield.
 
-  Clocks test case in clocksTest():
+  Clocks test case in Alarm.clocksTest():
     - Let several threads to sleep for a while and check theirs wake-up time.
     - The purpose is to test whether the alarm could act properly.
 
@@ -88,14 +88,31 @@
   listenChannel, which means it could use the channel, check whether a message
   is sent from the channel. If not, let it wait for speakerSended until a
   message is sent from the channel. Then, let it make a response and wake up
-  the speaker waiting for listenerReceived.
+  the speaker waiting for listenerReceived. Before finishing, it wakes a
+  listener waiting for listenChannel to inform it could enter the listen
+  channel.
 
   When a new speaker comes, if there are other speakers not finishing, let it
   wait for speakChannel. Otherwise, or in the cases that it is woken up from
   speakChannel, which means it could use the channel, let it send a message to
   the channel by putting the message in buf and wake up the listener waiting
   for speakerSended. Then, let the speaker wait for listenerReceived. The
-  speaker finishes when it receives the response from the listener.
+  speaker finishes when it receives the response from the listener and then it
+  wakes up a speaker waiting for speakChannel to inform it could enter the
+  speaker channel.
+
+  Listener waiting test case in Communicator.listenerWaitingTest():
+    - Run several listeners first and then run speakers.
+    - The purpose is to test whether it works in listener-waiting situation.
+
+  Speaker waiting test case in Communicator.speakerWaitingTest():
+    - Run several speakers first and then run listeners.
+    - The purpose is to test whether it works in speaker-waiting situation.
+
+  General test case in Communicator.generalTest():
+    - Run several speakers and listeners in interleaving order.
+    - The purpose is to test whether it works when there are many speakers and
+      listeners run at the same time.
 
 . PriorityScheduler
   The situations that efficientPriority of a thread might change are:
