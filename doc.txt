@@ -168,6 +168,21 @@
     - If the update increases the cached effective priority, then check if there 
       are donations from the current thread to other possible threads.
 
+  Low priority thread starving test in
+  PriorityScheduler.lowPriorityStarvingTest():
+    - Run two thread. One has lower priority than the other.
+    - The thread with higher priority is busy-waiting.
+    - Then, if using priority scheduler, the lower priority thread will starve.
+    - The purpose of the test is to check whether the scheduler always picks
+      the thread with highest priority.
+
+  Join deadlock solving test in PriorityScheduler.joinDeadlockTest():
+    - Run two thread. One has lower priority than the other.
+    - The thread with higher priority is busy-waiting.
+    - The current thread join the lower priority thread and the current thread
+      has the same priority as the higher priority threads.
+    - The purpose of the test is to check whether the scheduler could let the
+      current thread donate its priority to the lower priority thread.
 
 . Boat
   We can easily know there are three kind of trips with different conditions 
