@@ -115,20 +115,58 @@
       listeners run at the same time.
 
 . PriorityScheduler
-  The situations that efficientPriority of a thread might change are:
-    - It receives a donation from another thread. Then it should update its own
-      efficientPriority. If its own efficientPriority increase, it continues to
-      donate the priority to the thread that it is waiting for.
-    - It acquires a new sources and its efficientPrioirity should be updated by
+  There are two main tasks we implemented in this section:
+    1. Maintain the effectivePriority of each thread, which takes priority 
+       donations into account;
+    2. Schedule the threads based on priority and FIFO order.
+
+  Specifically, we have three interfaces WaitForAccess(), Acquire(), NextThread(),
+  and we need to modify the effective Priority in these activities. Besides, we
+  need to modify when the original priority (setPriority()) is changed. The
+  situations that efficientPriority of a thread might change are:
+    - It receives a donation from another thread (e.g. another thread with higher
+      priority invokes WaitForAccess whose resource it acquire). Then it should
+      update the efficientPriority. If its own efficientPriority increase, it
+      continues to donate the priority to the threads that it is waiting for.
+    - It acquires a new sources (e.g. it invokes Acquire or it is selected by 
+      NextThread by schedulers) and its efficientPrioirity should be updated by
       the maximum of the efficientPriority of the corresponding waitQueue. Note
       here we don't need to continue to donate the priority since the thread
       must not be blocked by others.
-    - It release a new sources and its efficentPriority should be recalculated.
-      Similarly to above case, we don't need to update the efficientPriority
-      of other here.
+    - It release a new sources (e.g. NextThread is invoked for some resource
+      when the thread is in its acquire list) and its efficentPriority should be
+      recalculated. Similarly to above case, we don't need to update the
+      efficientPriority of other here.
     - Its priority is changed by setPrioirty. Here we need to recalculate the
       efficientPrioirty and also update all the efficient prioity of threads
       affected by its donation.
+
+  Code realization:
+  1. class OrderedKThread is the record of a triple (thread, order, waitqueue). 
+     It is created every time a thread entered a queue (either a waiting queue
+     for WaitForAccess() or a acquire list for Acquire()). For each resource,
+     we maintain a waiting queue (PriorityQueue.waitPQueue) of all the threads
+     waiting for it, and a acquire list (PriorityQueue.AcquireList) of all the 
+     threads having acquired it. For each thread, we maintain a waiting list
+     (ThreadState.WaitList) of all the waiting queues it's in (or all the resource
+     it is waiting for), and a acquire list (ThreadState.AcquireList) of all the
+     resources it has acquired. For convenience the record in these lists are 
+     of type OrderedKThread. 
+     The OrderdKThread.order registers the FIFO order in the waitqueue. So in
+     acquire lists OrderdKThread.order is useless and we set it to zero.
+  2. The realization of WaitForAccess(), Acquire(), NextThread() are natural:
+     in NextThread(), we invoke poll() that pick the thread with the highest 
+     priority and FIFO order to break ties. We maintain the aforementioned 
+     lists and queues in the process, and update the effective priority when 
+     necessary (e.g. in the four circumstances previously discussed).
+  3. The effective priority is cached in ThreadState.CEpriority, and the cached
+     priority is returned for getEffectivePriority. When we need to recalculate
+     the effective priority we invoke ThreadState.updateEffectivePriority()
+     it does the following things:
+    - Recalculate the effective priority as the highest among the waiting queues 
+      whose resource the current thread acquires;
+    - If the update increases the cached effective priority, then check if there 
+      are donations from the current thread to other possible threads.
 
 
 . Boat
