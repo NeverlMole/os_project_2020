@@ -34,6 +34,16 @@
   disable interrupt and restore the interrupt in the similar way as that in
   Semaphore.
 
+  Waiting test in waitingTest:
+    - Let a thread sleep for condition but not wake up.
+    - The purpose is to test whether the sleep actions is correct.
+
+  Join test in joinTest:
+    - Use condition to realizing join function.
+    - Let a father thread fork a son thread and then sleep. Son thread will
+      wake the father thread up before finishing.
+    - The purpose is to test whether the thread could wake up correctly.
+
 . Alarm
   We use a list to store the threads waiting and their wake up time. Then, we
   wake up all threads that are eady to wake up in timerInterrupt. We could
