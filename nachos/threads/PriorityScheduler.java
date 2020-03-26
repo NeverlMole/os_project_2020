@@ -177,7 +177,7 @@ public class PriorityScheduler extends Scheduler {
       /*Here we remove all the acquired threads, which can be modified for other application*/
       for (Iterator i=AcquireList.iterator(); i.hasNext(); ){
          OrderedKThread iter = (OrderedKThread) (i.next());
-	 getThreadState(iter.thread).RemoveAcquire(iter);
+         getThreadState(iter.thread).RemoveAcquire(iter);
       }
       AcquireList = new LinkedList<OrderedKThread>();
       return (KThread) (nextt.thread);
@@ -331,6 +331,7 @@ public class PriorityScheduler extends Scheduler {
     
     public void RemoveAcquire(OrderedKThread othread){
       AcquireList.remove(othread);
+      getEffectivePriority();
     }
     /**
      * Called when the associated thread has acquired access to whatever is
