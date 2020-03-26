@@ -2,6 +2,9 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import java.util.LinkedList;
+import java.util.Iterator;
+
 /**
  * Uses the hardware timer to provide preemption, and to allow threads to sleep
  * until a certain time.
@@ -18,6 +21,8 @@ public class Alarm {
     Machine.timer().setInterruptHandler(new Runnable() {
       public void run() { timerInterrupt(); }
     });
+
+    waitQueue = new LinkedList<Pair>();
   }
 
   /**
@@ -26,7 +31,19 @@ public class Alarm {
    * thread to yield, forcing a context switch if there is another thread
    * that should be run.
    */
-  public void timerInterrupt() { KThread.currentThread().yield(); }
+  public void timerInterrupt() {
+    long currentTime = Machine.timer().getTime();
+
+    for (Iterator it = waitQueue.iterator(); it.hasNext();) {
+      Pair waitingObj = (Pair) it.next();
+      if (waitingObj.getWaitTime() <= currentTime) {
+        waitingObj.getThread().ready();
+        it.remove();
+      }
+    }
+
+    KThread.currentThread().yield();
+  }
 
   /**
    * Put the current thread to sleep for at least <i>x</i> ticks,
@@ -45,7 +62,63 @@ public class Alarm {
   public void waitUntil(long x) {
     // for now, cheat just to get something working (busy waiting is bad)
     long wakeTime = Machine.timer().getTime() + x;
-    while (wakeTime > Machine.timer().getTime())
-      KThread.yield();
+
+    if (wakeTime > Machine.timer().getTime()) {
+      waitQueue.add( new Pair(KThread.currentThread(), wakeTime) );
+
+      boolean intStatus = Machine.interrupt().disable();
+
+      KThread.sleep();
+
+      Machine.interrupt().restore(intStatus);
+    }
+  }
+
+  protected class Pair {
+    Pair(KThread thread, long waitTime) {
+      this.thread = thread;
+      this.waitTime = waitTime;
+    }
+
+    KThread getThread() { return this.thread; }
+    long getWaitTime() { return this.waitTime; }
+
+    private KThread thread;
+    private long waitTime;
+  }
+
+  private LinkedList<Pair> waitQueue;
+
+  /**
+   * Tests for Alarm.
+   */
+  private static class clockTest implements Runnable {
+    clockTest(long sleepTime) { this.sleepTime = sleepTime; }
+
+    public void run() {
+      ThreadedKernel.alarm.waitUntil(sleepTime);
+      System.out.println("*** thread " + KThread.currentThread()
+                         + " finished.");
+    }
+
+    private long sleepTime;
+  }
+
+  public static void clocksTest() {
+    LinkedList<KThread> clocksQueue = new LinkedList<KThread>();
+    for (int i = 1; i <= 5; i++){
+      KThread newClock = new KThread(new clockTest(i * 1000000));
+      clocksQueue.add(newClock);
+      newClock.setName("clock " + i);
+      newClock.fork();
+    }
+
+    while (!clocksQueue.isEmpty()){
+      clocksQueue.removeFirst().join();
+    }
+  }
+
+  public static void selfTest() {
+    clocksTest();
   }
 }
