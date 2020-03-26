@@ -47,6 +47,7 @@ public class PriorityScheduler extends Scheduler {
   public int getPriority(KThread thread) {
     Lib.assertTrue(Machine.interrupt().disabled());
 
+
     return getThreadState(thread).getPriority();
   }
 
@@ -119,6 +120,8 @@ public class PriorityScheduler extends Scheduler {
 
     return (ThreadState)thread.schedulingState;
   }
+
+  private static final char dbgPriorityScheduler = 'p';
 
   /** An entry in queues to record thread registration
    *  order: the order in the waitqueue to ensure FIFO
@@ -322,6 +325,10 @@ public class PriorityScheduler extends Scheduler {
           }
         }
       }
+
+      Lib.debug(dbgPriorityScheduler, "Thread " + thread
+              + " now has effective priority " + CEpriority);
+
       return CEpriority;
     }
 
@@ -390,7 +397,7 @@ public class PriorityScheduler extends Scheduler {
     public void run() {
       System.out.println("Thread " + KThread.currentThread()
                          + " starts busy-waiting.");
-      while (true) { KThread.yield(); }
+      for (int i = 1; i <= 20; i++) { KThread.yield(); }
     }
   }
 
@@ -420,7 +427,27 @@ public class PriorityScheduler extends Scheduler {
     highBusy.join();
   }
 
+  public static void joinDeadlockTest() {
+    KThread highBusy = new KThread(new busyWaitingTest());
+    KThread lowQuick = new KThread(new quickTest());
+    highBusy.setName("busy");
+    lowQuick.setName("low");
+
+    boolean intStatus = Machine.interrupt().disable();
+
+    ThreadedKernel.scheduler.setPriority(highBusy, 2);
+    ThreadedKernel.scheduler.setPriority(KThread.currentThread(), 2);
+
+    Machine.interrupt().restore(intStatus);
+
+    lowQuick.fork();
+    highBusy.fork();
+
+    lowQuick.join();
+    highBusy.join();
+  }
+
   public static void selfTest() {
-    lowPriorityStarvingTest();
+    joinDeadlockTest();
   }
 }
