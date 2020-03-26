@@ -44,7 +44,6 @@ public class PriorityScheduler extends Scheduler {
     return new PriorityQueue(transferPriority);
   }
 
-
   public int getPriority(KThread thread) {
     Lib.assertTrue(Machine.interrupt().disabled());
 
@@ -123,22 +122,25 @@ public class PriorityScheduler extends Scheduler {
 
   /** An entry in queues to record thread registration
    *  order: the order in the waitqueue to ensure FIFO
-   * 
+   *
    *  used in both resource and thread records.
-   */ 	
+   */
   private class OrderedKThread {
-     public KThread thread;
-     public int order;
-     public ThreadQueue queue;
-      OrderedKThread(KThread thread, int order, ThreadQueue queue){
-	this.thread = thread;
-        this.order = order;
-        this.queue = queue;
-      }	
+    public KThread thread;
+    public int order;
+    public ThreadQueue queue;
+    OrderedKThread(KThread thread, int order, ThreadQueue queue) {
+      this.thread = thread;
+      this.order = order;
+      this.queue = queue;
     }
+  }
 
-  public static int max(int a,int b){
-    if(a>b) return a; else return b;
+  public static int max(int a, int b) {
+    if (a > b)
+      return a;
+    else
+      return b;
   }
   /*************************************************************************************************/
   /**
@@ -153,7 +155,7 @@ public class PriorityScheduler extends Scheduler {
       Lib.assertTrue(Machine.interrupt().disabled());
       OrderedKThread temp = new OrderedKThread(thread, waitPQueue.size(), this);
       waitPQueue.add(temp);
-      //print();
+      // print();
       ThreadState threadstate = getThreadState(thread);
       threadstate.waitForAccess(temp);
       /* check donations: */
@@ -165,77 +167,86 @@ public class PriorityScheduler extends Scheduler {
       ThreadState threadstate = getThreadState(thread);
       AcquireList.add(threadstate.acquire(this));
       /* update the effective priority if there are waiting threads*/
-      if(!waitPQueue.isEmpty()) threadstate.getEffectivePriority();
+      if (!waitPQueue.isEmpty())
+        threadstate.updateEffectivePriority();
     }
 
     public KThread nextThread() {
       Lib.assertTrue(Machine.interrupt().disabled());
       if (waitPQueue.isEmpty())
-	   return null;
+        return null;
       OrderedKThread nextt = poll();
-      getThreadState(nextt.thread).RemoveWait(nextt);  
-      /*Here we remove all the acquired threads, which can be modified for other application*/
-      for (Iterator i=AcquireList.iterator(); i.hasNext(); ){
-         OrderedKThread iter = (OrderedKThread) (i.next());
-         getThreadState(iter.thread).RemoveAcquire(iter);
+      getThreadState(nextt.thread).RemoveWait(nextt);
+      /*Here we remove all the acquired threads, which can be modified for other
+       * application*/
+      for (Iterator i = AcquireList.iterator(); i.hasNext();) {
+        OrderedKThread iter = (OrderedKThread)(i.next());
+        getThreadState(iter.thread).RemoveAcquire(iter);
       }
       AcquireList = new LinkedList<OrderedKThread>();
-      return (KThread) (nextt.thread);
+
+      acquire(nextt.thread);
+      return (KThread)(nextt.thread);
     }
 
     /*Comparator for the priority queue*/
-    public int compare(OrderedKThread t1, OrderedKThread t2){
-      int Cmpr = getThreadState(t2.thread).CEpriority-getThreadState(t1.thread).CEpriority;
-      if (Cmpr==0) return t1.order-t2.order;      
+    public int compare(OrderedKThread t1, OrderedKThread t2) {
+      int Cmpr = getThreadState(t2.thread).CEpriority -
+                 getThreadState(t1.thread).CEpriority;
+      if (Cmpr == 0)
+        return t1.order - t2.order;
       return Cmpr;
     };
 
-    public OrderedKThread poll(){
+    public OrderedKThread poll() {
       OrderedKThread poll = null;
-      for (Iterator i=waitPQueue.iterator(); i.hasNext(); ){
-        OrderedKThread iter = (OrderedKThread) (i.next());
-        if (poll==null) poll=iter; else {
-          if(compare(poll, iter)>0) poll=iter;
-        } 
+      for (Iterator i = waitPQueue.iterator(); i.hasNext();) {
+        OrderedKThread iter = (OrderedKThread)(i.next());
+        if (poll == null)
+          poll = iter;
+        else {
+          if (compare(poll, iter) > 0)
+            poll = iter;
+        }
       }
-      for (Iterator i=waitPQueue.iterator(); i.hasNext(); ){
-        OrderedKThread iter = (OrderedKThread) (i.next());
-	if (iter.order>poll.order) iter.order--;
+      for (Iterator i = waitPQueue.iterator(); i.hasNext();) {
+        OrderedKThread iter = (OrderedKThread)(i.next());
+        if (iter.order > poll.order)
+          iter.order--;
       }
       waitPQueue.remove(poll);
       return poll;
     }
 
-    public boolean isEmpty(){
-       return waitPQueue.isEmpty();
-    }
+    public boolean isEmpty() { return waitPQueue.isEmpty(); }
 
     /* Returns the highest effective priority in the waiting queue */
-    public int MaxPriority(){
+    public int MaxPriority() {
       int Maxprior = priorityMinimum;
-      for (Iterator i=waitPQueue.iterator(); i.hasNext(); ){
-         OrderedKThread iter = (OrderedKThread) (i.next());
-	 Maxprior = max(Maxprior, getThreadState(iter.thread).CEpriority); 
+      for (Iterator i = waitPQueue.iterator(); i.hasNext();) {
+        OrderedKThread iter = (OrderedKThread)(i.next());
+        Maxprior = max(Maxprior, getThreadState(iter.thread).CEpriority);
       }
       return Maxprior;
     }
 
     /* check if there are acquired threads in need of priority donation*/
-    public void CheckAcquire(int Cpriority){
-      for (Iterator i=AcquireList.iterator(); i.hasNext(); ){
-         OrderedKThread iter = (OrderedKThread) (i.next());
-         ThreadState iterstate = getThreadState(iter.thread);
-	 if(Cpriority>iterstate.CEpriority) iterstate.getEffectivePriority();
+    public void CheckAcquire(int Cpriority) {
+      for (Iterator i = AcquireList.iterator(); i.hasNext();) {
+        OrderedKThread iter = (OrderedKThread)(i.next());
+        ThreadState iterstate = getThreadState(iter.thread);
+        iterstate.updateEffectivePriority();
       }
     }
     public void print() {
-      Lib.assertTrue(Machine.interrupt().disabled());	 
+      Lib.assertTrue(Machine.interrupt().disabled());
       System.out.print("Queue size: ");
-      System.out.print(waitPQueue.size()); 
+      System.out.print(waitPQueue.size());
       System.out.print(", with: ");
-      for (Iterator i=waitPQueue.iterator(); i.hasNext(); ){
-          KThread iter = (KThread) ((OrderedKThread) i.next()).thread ;
-	  System.out.print(iter + " effective priority: " + getThreadState(iter).CEpriority + "\n"); 
+      for (Iterator i = waitPQueue.iterator(); i.hasNext();) {
+        KThread iter = (KThread)((OrderedKThread)i.next()).thread;
+        System.out.print(iter + " effective priority: " +
+                         getThreadState(iter).CEpriority + "\n");
       }
       System.out.print("\n");
     }
@@ -244,10 +255,12 @@ public class PriorityScheduler extends Scheduler {
      * threads to the owning thread.
      */
     public boolean transferPriority;
-    private LinkedList<OrderedKThread> waitPQueue = new LinkedList<OrderedKThread>();
-    private LinkedList<OrderedKThread> AcquireList = new LinkedList<OrderedKThread>();
+    private LinkedList<OrderedKThread> waitPQueue =
+        new LinkedList<OrderedKThread>();
+    private LinkedList<OrderedKThread> AcquireList =
+        new LinkedList<OrderedKThread>();
   }
-	
+
   /*************************************************************************************************/
   /**
    * The scheduling state of a thread. This should include the thread's
@@ -280,19 +293,27 @@ public class PriorityScheduler extends Scheduler {
      *
      * @return	the effective priority of the associated thread.
      */
-    public int getEffectivePriority() {	
+    public int getEffectivePriority() {
+      return CEpriority;
+    }
+
+    public int updateEffectivePriority() {
       Lib.assertTrue(Machine.interrupt().disabled());
-      int PrevCEpriority = CEpriority;	 
+      int PrevCEpriority = CEpriority;
       CEpriority = priority;
-      for (Iterator i=AcquireList.iterator(); i.hasNext(); ){
-        OrderedKThread iter = (OrderedKThread) (i.next());
-        CEpriority = max(CEpriority, ((PriorityQueue) (iter.queue)).MaxPriority());
+
+      for (Iterator i = AcquireList.iterator(); i.hasNext();) {
+        OrderedKThread iter = (OrderedKThread)(i.next());
+        CEpriority =
+            max(CEpriority, ((PriorityQueue)(iter.queue)).MaxPriority());
       }
-      /* the rise of effective priority may affect the donation in other waiting queues*/
-      if(CEpriority>PrevCEpriority) {
-        for (Iterator i=WaitList.iterator(); i.hasNext(); ){
-          OrderedKThread iter = (OrderedKThread) (i.next());
-          ((PriorityQueue) (iter.queue)).CheckAcquire(CEpriority);
+
+      /* the rise of effective priority may affect the donation in other waiting
+       * queues*/
+      if (CEpriority != PrevCEpriority) {
+        for (Iterator i = WaitList.iterator(); i.hasNext();) {
+          OrderedKThread iter = (OrderedKThread)(i.next());
+          ((PriorityQueue)(iter.queue)).CheckAcquire(CEpriority);
         }
       }
       return CEpriority;
@@ -303,10 +324,10 @@ public class PriorityScheduler extends Scheduler {
      *
      * @param	priority	the new priority.
      */
-    public void setPriority(int priority) {  
-      Lib.assertTrue(Machine.interrupt().disabled());	  
+    public void setPriority(int priority) {
+      Lib.assertTrue(Machine.interrupt().disabled());
       this.priority = priority;
-      getEffectivePriority();
+      updateEffectivePriority();
     }
 
     /**
@@ -321,17 +342,13 @@ public class PriorityScheduler extends Scheduler {
      *
      * @see	nachos.threads.ThreadQueue#waitForAccess
      */
-    public void waitForAccess(OrderedKThread othread) {
-      WaitList.add(othread);
-    }
+    public void waitForAccess(OrderedKThread othread) { WaitList.add(othread); }
 
-    public void RemoveWait(OrderedKThread othread){
-      WaitList.remove(othread);
-    }
-    
-    public void RemoveAcquire(OrderedKThread othread){
+    public void RemoveWait(OrderedKThread othread) { WaitList.remove(othread); }
+
+    public void RemoveAcquire(OrderedKThread othread) {
       AcquireList.remove(othread);
-      getEffectivePriority();
+      updateEffectivePriority();
     }
     /**
      * Called when the associated thread has acquired access to whatever is
@@ -348,14 +365,15 @@ public class PriorityScheduler extends Scheduler {
       AcquireList.add(temp);
       return temp;
     }
-     
     /** The thread with which this object is associated. */
     protected KThread thread;
     /** The priority of the associated thread. */
     protected int priority;
     /* Cached effective priority*/
-    protected int CEpriority=priorityDefault;
-    private LinkedList<OrderedKThread> WaitList = new LinkedList<OrderedKThread>();
-    private LinkedList<OrderedKThread> AcquireList = new LinkedList<OrderedKThread>();
+    protected int CEpriority;
+    private LinkedList<OrderedKThread> WaitList =
+        new LinkedList<OrderedKThread>();
+    private LinkedList<OrderedKThread> AcquireList =
+        new LinkedList<OrderedKThread>();
   }
 }
