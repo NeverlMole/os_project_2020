@@ -104,6 +104,58 @@
       affected by its donation.
 
 
+. Boat
+  We can easily know there are three kind of trips with different conditions 
+  in the best strategies:
+    1.Two children from Oahu to Molokai (condition1: Child in Oahu, Boat in 
+      Oahu, and number of children in Oahu >= 2).
+    2.One adult from Oahu to Molokai. (condition2: Adult in Oahu, Boat in Oahu, 
+      and number of children in Oahu < 2).
+    3.One child from Molokai to Oahu. (condition3: Child in Molokai, Boat in 
+      Molokai).
+   
+  So the easy way is use three condition variables to organize the three 
+  conditions, and we find the three conditions are mutually exclusive. If the 
+  conditions aren't satisfied, then we sleep. Until satisfied, we wake a thread
+  corresponding to the this condition variable.
+
+  And also we need to design these common variables:
+    - "boat" The boat place (The information everybody can know)
+    - "has_pilot" Do there has pilot(Because when two children go, they must be 
+      a pilot and a rider, we will let first child become pilot, hence others 
+      can know there is a pilot and go to be a rider).
+    - Numbers of adults/children in Oahu/Molokai (Everybody can just know the 
+      number of same side).
+    - Three condition variables for condition 1, 2, 3.
+    - A condition variable to describe whether is finished, and it can let the 
+      parent thread sleep.
+
+  Hence we finish the problem like this:
+    - First, in the "begin()", we fork the "child" and "adult" threads, and 
+      initialize all the common variables. Then we let it sleep and switch to 
+      other threads.
+    - For adult thread, first take the lock. He only have a trip from Oahu to 
+      Molokai. So you only need to wait the "condition2" satisfied and go to 
+      Molokai.
+    - For child thread, first take the lock. He may go and return between two 
+      places. So you need to use a private variable to describe the place. And 
+      each time:
+        1.In Oahu, waiting for the "condition 1". If there's no pilot, then 
+          this thread become pilot. And also wake a thread which wait for 
+          "condition 1", and let it become the rider(use common variable 
+          "has_pilot"). After go to Molokai, update the common variables. If all 
+          people have reached Molokai, then wake parent thread, otherwise, just 
+          wake the corresponding thread.
+        2.In Molokai, waiting for the "condition 3", and go to Oahu, update the 
+          common variables. And judge the number of children in Oahu, wake the 
+          corresponding thread.
+        3.After go for a trip, the current thread must be sleep otherwise there 
+          will be more than one threads awake at same time.
+
+  SelfTest:
+    This part of this problem is easy, I just test some like "3 3", "10 9", "17 
+    5", "5 20", and it all perform correctly.
+
 . Some other modification on the original code.
   - Check the status of the current thread is not running.
   - Change one line yield(); to KThread.yield(); in KThread class.
