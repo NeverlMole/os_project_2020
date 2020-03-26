@@ -17,10 +17,10 @@ public class Communicator {
    */
   public Communicator() {
     lock = new Lock();
-    listenChannel = new Condition(lock);
-    speakChannel = new Condition(lock);
-    speakerSended = new Condition(lock);
-    listenerReceived = new Condition(lock);
+    listenChannel = new Condition2(lock);
+    speakChannel = new Condition2(lock);
+    speakerSended = new Condition2(lock);
+    listenerReceived = new Condition2(lock);
   }
 
   /**
@@ -114,10 +114,10 @@ public class Communicator {
   }
 
   private Lock lock;
-  private Condition listenChannel;
-  private Condition speakChannel;
-  private Condition speakerSended;
-  private Condition listenerReceived;
+  private Condition2 listenChannel;
+  private Condition2 speakChannel;
+  private Condition2 speakerSended;
+  private Condition2 listenerReceived;
 
   private int numSpeakers = 0;
   private int numListeners = 0;
