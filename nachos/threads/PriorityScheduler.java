@@ -304,8 +304,11 @@ public class PriorityScheduler extends Scheduler {
 
       for (Iterator i = AcquireList.iterator(); i.hasNext();) {
         OrderedKThread iter = (OrderedKThread)(i.next());
-        CEpriority =
-            max(CEpriority, ((PriorityQueue)(iter.queue)).MaxPriority());
+
+        if (((PriorityQueue)(iter.queue)).transferPriority) {
+          CEpriority = max(CEpriority,
+                  ((PriorityQueue)(iter.queue)).MaxPriority() );
+        }
       }
 
       /* the rise of effective priority may affect the donation in other waiting
@@ -313,7 +316,10 @@ public class PriorityScheduler extends Scheduler {
       if (CEpriority != PrevCEpriority) {
         for (Iterator i = WaitList.iterator(); i.hasNext();) {
           OrderedKThread iter = (OrderedKThread)(i.next());
-          ((PriorityQueue)(iter.queue)).CheckAcquire(CEpriority);
+
+          if (((PriorityQueue)(iter.queue)).transferPriority) {
+            ((PriorityQueue)(iter.queue)).CheckAcquire(CEpriority);
+          }
         }
       }
       return CEpriority;
@@ -375,5 +381,46 @@ public class PriorityScheduler extends Scheduler {
         new LinkedList<OrderedKThread>();
     private LinkedList<OrderedKThread> AcquireList =
         new LinkedList<OrderedKThread>();
+  }
+
+  /**
+   * Tests for PriorityScheduler.
+   */
+  public static class busyWaitingTest implements Runnable {
+    public void run() {
+      System.out.println("Thread " + KThread.currentThread()
+                         + " starts busy-waiting.");
+      while (true) { KThread.yield(); }
+    }
+  }
+
+  public static class quickTest implements Runnable {
+    public void run() {
+      System.out.println("Thread " + KThread.currentThread()
+                         + " quickly finished.");
+    }
+  }
+
+  public static void lowPriorityStarvingTest() {
+    KThread highBusy = new KThread(new busyWaitingTest());
+    KThread lowQuick = new KThread(new quickTest());
+    highBusy.setName("busy");
+    lowQuick.setName("low");
+
+    boolean intStatus = Machine.interrupt().disable();
+
+    ThreadedKernel.scheduler.setPriority(highBusy, 2);
+
+    Machine.interrupt().restore(intStatus);
+
+    lowQuick.fork();
+    highBusy.fork();
+
+    lowQuick.join();
+    highBusy.join();
+  }
+
+  public static void selfTest() {
+    lowPriorityStarvingTest();
   }
 }
