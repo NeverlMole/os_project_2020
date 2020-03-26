@@ -1,6 +1,7 @@
 package nachos.threads;
 
 import nachos.machine.*;
+import java.util.LinkedList;
 
 /**
  * A KThread is a thread that can be used to execute Nachos kernel code. Nachos
@@ -186,6 +187,14 @@ public class KThread {
 
     currentThread.status = statusFinished;
 
+    if (currentThread.joinQueue != null) {
+      KThread fatherThread = currentThread.joinQueue.nextThread();
+
+      Lib.assertTrue(fatherThread != null);
+
+      fatherThread.ready();
+    }
+
     sleep();
   }
 
@@ -268,6 +277,22 @@ public class KThread {
     Lib.debug(dbgThread, "Joining to thread: " + toString());
 
     Lib.assertTrue(this != currentThread);
+
+    if (status == statusFinished) {
+      return;
+    }
+
+    boolean intStatus = Machine.interrupt().disable();
+
+    Lib.assertTrue(joinQueue == null);
+
+    joinQueue = ThreadedKernel.scheduler.newThreadQueue(true);
+    joinQueue.acquire(this);
+    joinQueue.waitForAccess(currentThread);
+
+    KThread.sleep();
+
+    Machine.interrupt().restore(intStatus);
   }
 
   /**
@@ -388,6 +413,47 @@ public class KThread {
     private int which;
   }
 
+  private static class sonTest implements Runnable {
+    sonTest(int which) { this.which = which; }
+
+    public void run() {
+        System.out.println("*** son " + which + " finished.");
+    }
+
+    private int which;
+  }
+
+  public static void fatherSonsTest(){
+    Lib.debug(dbgThread, "Enter KThread.fatherSonsTest for testing join");
+
+    for (int i = 1; i <= 5; i++) {
+      KThread newSon = new KThread(new sonTest(i * 2 - 1));
+      newSon.setName("son thread " + (i * 2 - 1)).fork();
+
+      KThread newSon2 = new KThread(new sonTest(i * 2));
+      newSon2.setName("son thread " + (i * 2)).fork();
+
+      newSon.join();
+      System.out.println("*** father joined with " + newSon.toString());
+      newSon2.join();
+      System.out.println("*** father joined with " + newSon2.toString());
+    }
+
+    LinkedList<KThread> sonThreads = new LinkedList<KThread>();
+
+    for (int i = 1; i <= 5; i++) {
+      KThread newSon = new KThread(new sonTest(i));
+      newSon.setName("son thread " + i).fork();
+      sonThreads.add(newSon);
+    }
+
+    while (!sonThreads.isEmpty()) {
+      KThread nextSon = sonThreads.removeLast();
+      nextSon.join();
+      System.out.println("*** father joined with " + nextSon.toString());
+    }
+  }
+
   /**
    * Tests whether this module is working.
    */
@@ -396,6 +462,8 @@ public class KThread {
 
     new KThread(new PingTest(1)).setName("forked thread").fork();
     new PingTest(0).run();
+
+    fatherSonsTest();
   }
 
   private static final char dbgThread = 't';
@@ -422,6 +490,7 @@ public class KThread {
   private String name = "(unnamed thread)";
   private Runnable target;
   private TCB tcb;
+  private ThreadQueue joinQueue = null;
 
   /**
    * Unique identifer for this thread. Used to deterministically compare

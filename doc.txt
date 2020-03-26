@@ -10,21 +10,21 @@
 
   Specific changes to KThread.join():
     - If the thread (this) is finished, return directly.
-    - Check the thread (this) status is ready.
     - Check join is not previously called by checking joinQueue is null.
-    - View the join as a source and let the thread to acquire the source and
-      let the current thread to wait via joinQueue.
+    - View the join as a source, let the thread acquire the source and let the
+      current thread wait via joinQueue.
     - Disable interrupt and restore at the end just like KThread.yield().
 
   Specific changes to KThread.finish():
-    - If the current thread has the waitQueue, wake the thread in waitQueue.
+    - If the current thread has the joinQueue, wake the thread in joinQueue.
 
   Father-sons test case in KThread.fatherSonsTest():
     - Run father thread and fork several sons thread.
-    - Father thread wait for each son to finish and print corresponding
-      messages.
+    - Father thread wait for each son to finish before forking another son.
+    - Father thread wait for sons to finish after forking all sons.
     - The purpose is to test whether the father thread could wait for each son
-      thread to finish correctly.
+      thread to finish correctly and also whether the father thred could
+      return immediately if the joining son has already finished.
 
 . Condition2
   We direct use the same implementation as in Condition, except we replace
