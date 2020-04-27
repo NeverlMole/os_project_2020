@@ -1,2 +1,6 @@
 .*
 nachos/proj1/*
+nachos/proj2/*
+*.coff
+*.a
+*.o
