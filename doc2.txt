@@ -57,7 +57,8 @@
   after exiting the process no matter whether it exits normally or abnormally.
   In the function, the file descriptors is freed, memory is freed by
   unloadSections(), the corresponding thread is finished or the kernel is
-  terminated if it is the last process.
+  terminated if it is the last process. The function is also used in
+  handleSyscall and handleException for abnormal cases.
 
   For join, we use childProcesses to check whether the pid is valid for join
   and use join() from thread to do it.
