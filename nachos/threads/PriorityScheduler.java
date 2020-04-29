@@ -128,7 +128,7 @@ public class PriorityScheduler extends Scheduler {
    *
    *  used in both resource and thread records.
    */
-  private class OrderedKThread {
+  protected class OrderedKThread {
     public KThread thread;
     public int order;
     public ThreadQueue queue;
@@ -258,9 +258,9 @@ public class PriorityScheduler extends Scheduler {
      * threads to the owning thread.
      */
     public boolean transferPriority;
-    private LinkedList<OrderedKThread> waitPQueue =
+    protected LinkedList<OrderedKThread> waitPQueue =
         new LinkedList<OrderedKThread>();
-    private LinkedList<OrderedKThread> AcquireList =
+    protected LinkedList<OrderedKThread> AcquireList =
         new LinkedList<OrderedKThread>();
   }
 
@@ -384,9 +384,9 @@ public class PriorityScheduler extends Scheduler {
     protected int priority;
     /* Cached effective priority*/
     protected int CEpriority;
-    private LinkedList<OrderedKThread> WaitList =
+    protected LinkedList<OrderedKThread> WaitList =
         new LinkedList<OrderedKThread>();
-    private LinkedList<OrderedKThread> AcquireList =
+    protected LinkedList<OrderedKThread> AcquireList =
         new LinkedList<OrderedKThread>();
   }
 
