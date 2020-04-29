@@ -1,0 +1,106 @@
+. Vitual memory allocation
+  Using a list to store all the free physical page in UserKernel class and also
+  a lock to protect the mutex of the physical page allocation. API for
+  allocating and free memory pages are provided in UserKernel class. A bitmap
+  storing the state of each physical page is also stored in UserKernel class to
+  make sure no page are allocated twice or free twice.
+
+  New variables defined in UserKernel:
+    - private list<int> freePageList
+        : the list of all free physical pages.
+    - private boolean[] isPageUsed
+        : represented where a physical page is used.
+    - private lock pageAllocation
+        : lock for page allocation.
+
+  New functions defined in UserKernel:
+    - public int allocatePage()
+        : Use the lock to protect mutex of physical pages.
+        : Find a free page to allocate, double check the page using isPageUsed,
+          update freePageList and isPageUsed and return the page number.
+    - public void freePage(int ppn)
+        : Use the lock to protect mutex of physical pages.
+        : Check ppn is used and updage freePageList and isPageUsed.
+
+  Modification to functions in UserKernel:
+    - initialize(String)
+        : Add initilization for freePageList, isPageUsed and pageAllocation.
+
+  Modification to functions in UserProcess:
+    - UserProcess()
+        : Remove the initiliation for pageTable.
+    - loadSection()
+        : Check the number of available pages is enough.
+        : Add the allocation of physical memory using UserKernel.allocatePage()
+          and set pageTable accordingly.
+        : Load the section to the accoresponding physical page according to
+          pageTable and also change the mark of readOnly according to the mark
+          of section.
+    - readVirtualMemory(int, byte[], int, int)
+        : Modify the physical address according to pageTable.
+    - writeVirtualMemory(int, byte[], int, int)
+        : Modify the physical address according to pageTable.
+
+. System call halt
+  Use a flag isRoot to represent whether a process is root process and return
+  immediately in handleHalt if the process is not rootProcess.
+
+. System call exec, exit and join
+  Each process has its own Process ID and we use a static variable to represent
+  the next Process ID. Each process also has a list of its child processes.
+  Process ID start from 0 and the process with 0 process ID is the root
+  process. We also use a static variable to denote the number of processes
+  still alive. Also, we use a variable to represent its return status if it
+  successfully returned and a variable to represent whether it exited normally.
+
+  For exit, we define a new function in UserProcess that deals with the cleanup
+  after exiting the process no matter whether it exits normally or abnormally.
+  In the function, the file descriptors is freed, memory is freed by
+  unloadSections(), the corresponding thread is finished or the kernel is
+  terminated if it is the last process.
+
+  For join, we use childProcesses to check whether the pid is valid for join
+  and use join() from thread to do it.
+
+  New variables defined in UserProcess:
+    - private int processID
+    - private static int nextProcessID
+    - private list<UserProcess> childProcesses
+        : stored all its child Processes.
+    - private static int numRunningProcess
+    - private int returnStatus
+    - private boolean normallyExit
+        : initially false.
+    - private UThread thread
+        : the corresponding thread that execute the process.
+
+  Modification to functions in UserProcess:
+    - execute(String, String[])
+        : Initialize this.thread.
+    - unloadSections()
+        : Free all the memory page allocated by UserKernel.freePage().
+
+  New functions defined in UserProcess:
+    - private int handleExec(int fileAddr, int argc, int argvAddr)
+        : Get the file name and argv[] using readVirtualMemoryString. Check
+          argc is non-negative.
+        : Create a new UserProcess and run UserProcess.execute() to execute the
+          new process. If not succeed, return -1.
+        : Update the childProcesses.
+        : Return the new process ID.
+    - private void finish()
+        : Close coff, file descriptors.
+        : Free the memory by unloadSections().
+        : Run this.thread.finish() if the process is not the last one.
+        : Run UserKernel.terminate() if the process is the last one.
+        : Check the function never return.
+    - private int handleExit(int status)
+        : Set nonmallyExit to true and set returnStatus to status.
+        : Run this.finish().
+    - private int handleJoin(int pid, int statusAddr)
+        : Find the child process with pid in childProcesses. Return -1 if not
+          find. If find, denote the child process as child.
+        : Run child.thread.join().
+        : If the child exit normally, write child.returnStatus to statusAddr
+          by writeVirtualMemory and return 1.
+        : If the child exit abnormally or the write to memory fails, return 0.
