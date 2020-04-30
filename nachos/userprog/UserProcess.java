@@ -476,14 +476,22 @@ public class UserProcess {
 
   private int handleRead(int a0, int a1, int a2) {
     Lib.debug(dbgProcess, "UserProcess.Read()");
+
     if (!checkDescr(a0)) return -1;
     byte[] buff = new byte[a2];
     int tryread = FileDescr[a0].read(buff, 0, a2);
-    if(tryread == -1){ 
+
+    Lib.debug(dbgProcess, "Read bits " + tryread + ".");
+
+    if (tryread == -1) {
       Lib.debug(dbgProcess, "\tread failed");
       return -1;
     }
-    int trywrite = writeVirtualMemory(a1, buff);
+    int trywrite = writeVirtualMemory(a1, buff, 0, tryread);
+
+    if (trywrite < tryread) {
+      return -1;
+    }
     return trywrite;
   }
 
@@ -493,12 +501,12 @@ public class UserProcess {
     byte[] buff = new byte[a2];
 
     int tryread = readVirtualMemory(a1, buff);
-    if(tryread == -1){ 
+    if(tryread != a2){ 
       Lib.debug(dbgProcess, "\tload failed");
       return -1;
     }
     int trywrite = FileDescr[a0].write(buff, 0, a2);
-    if(trywrite < a2){ 
+    if(trywrite != a2){ 
       Lib.debug(dbgProcess, "\twrite incomplete");
       return -1;
     }
