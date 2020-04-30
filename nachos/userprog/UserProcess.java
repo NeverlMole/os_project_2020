@@ -28,8 +28,6 @@ public class UserProcess {
     for(int i=0; i<16; i++) {
       FileDescr[i] = null;
     }
-    FileDescr[0] = UserKernel.console.openForReading();
-    FileDescr[1] = UserKernel.console.openForWriting();
   }
 
   /**
@@ -56,7 +54,6 @@ public class UserProcess {
       return false;
 
     thread = new UThread(this);
-    thread.setName(name).fork();
 
     // init processID.
     processID = nextProcessID;
@@ -73,6 +70,12 @@ public class UserProcess {
     for (int i = 0; i < args.length; i++) {
       Lib.debug(dbgProcess, " - " + args[i]);
     }
+
+    // init stdin, stdout.
+    FileDescr[0] = UserKernel.console.openForReading();
+    FileDescr[1] = UserKernel.console.openForWriting();
+
+    thread.setName(name).fork();
 
     return true;
   }
@@ -398,6 +401,12 @@ public class UserProcess {
 
   private void finish() {
     coff.close();
+    for (int i = 0; i < 16; i++) {
+      if (FileDescr[i] != null) {
+        FileDescr[i].close();
+        FileDescr[i] = null;
+      }
+    }
     unloadSections();
 
     if (numRunningProcess == 1) {
@@ -826,6 +835,7 @@ public class UserProcess {
 
   private int initialPC, initialSP;
   private int argc, argv;
+
 
   private static final int pageSize = Processor.pageSize;
   private static final char dbgProcess = 'a';
