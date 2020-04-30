@@ -27,13 +27,6 @@
         : Initilize the FileDescr array: set 0, 1 as the stdin, stdout.
 
 . Test cases from c-level
-  - Read and write from consoles (keyboards, terminal)
-      : Create a process that echos the input from keyboard.
-      : The purpose is to test whether stdin, stdout is correctly set.
-  - Read and write from files (keyboards, terminal)
-      : Create a process that creates a file, write certain contents into it, and 
-        read the whole file to print it on the screen.
-      : The purpose is to test the basic functionalities of create, read, etc.
 
 
 . Vitual memory allocation
@@ -146,6 +139,28 @@
           by writeVirtualMemory and return 1.
         : If the child exit abnormally, return 0.
 
+. Lottery Scheduler
+  The current implementation follows almost naturally from the priority scheduler
+  last time with the following modification:
+
+  - newThreadState
+      : Has the same functionality as ThreadState, but used in the lottery
+        scheduler.
+  - newThreadState.ticket
+      : Caches the number of tickets one process holds.
+  - newThreadState.updateLottery()
+      : Like updateEffectivePriority(), calculates the ticket transfer and updates
+        newThreadState.ticket.
+      : It is assumed that the initial ticket number equals to the priority (with
+        minimum 1).
+ - LotteryQueue.poll2()
+      : Holds a lottery among the waiting tickets, returns the winner (null if no
+        one is waiting).
+ - LotteryQueue.SumTicket()
+      : Calculate the total number of tickets in the waiting queue waitPQueue (see
+        doc1.txt for the implementation of waitPQueue in PriorityQueue).
+
+
 . Test cases from Java-level
   - Memory allocate, free, read and write test in UserProcess.memoryTest()
       : Create a new process and use UserKernel.allocatePage() to allocate
@@ -158,6 +173,15 @@
       : The purpose is to test allocate, free, read and write functions.
 
 . Test cases from c-level
+  - Read and write from consoles (keyboards, terminal) in ter_read_write.c
+      : Create a process that echos the input from keyboard.
+      : The purpose is to test whether stdin, stdout is correctly set.
+
+  - Read and write from files (keyboards, terminal) in file_read_write.c
+      : Create a process that creates a file, write certain contents into it, and
+        read the whole file to print it on the screen.
+      : The purpose is to test the basic functionalities of create, read, etc.
+
   - Exec test in exec.c
       : Run different code via exec.c.
       : The purpose is to test whether exec system call is correctly coded.
@@ -192,25 +216,3 @@
       : Creat an array with length 10 and try to read or write to array entry
         with index 20.
       : The purpose is to test the error of index out of range.
-
-. Lottery Scheduler 
-  The current implementation follows almost naturally from the priority scheduler
-  last time with the following modification:
-  
-  - newThreadState
-      : Has the same functionality as ThreadState, but used in the lottery 
-        scheduler.
-  - newThreadState.ticket
-      : Caches the number of tickets one process holds.
-  - newThreadState.updateLottery()
-      : Like updateEffectivePriority(), calculates the ticket transfer and updates
-        newThreadState.ticket.
-      : It is assumed that the initial ticket number equals to the priority (with
-        minimum 1).
- - LotteryQueue.poll2()
-      : Holds a lottery among the waiting tickets, returns the winner (null if no
-        one is waiting).
- - LotteryQueue.SumTicket()
-      : Calculate the total number of tickets in the waiting queue waitPQueue (see 
-        doc1.txt for the implementation of waitPQueue in PriorityQueue).
-
