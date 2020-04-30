@@ -1,3 +1,41 @@
+. File system call implementation
+  Using an array to store the file descriptor correspondence in the UserProcess 
+  class. APIs for file opening, closing and removing are provided in 
+  ThreadedKernel.fileSystem by name; APIs for file reading, writing and closing 
+  are provided in machine.OpenFile. Thus we need to make a bridge in between.
+
+  New variables defined in UserKernel:
+    - private OpenFile[] FileDescr
+        : Stores the array of OpenFile status associated with each file descriptor.
+        : Initially stores only stdin, stdout; stores new file status for each 
+          successful open/create operation.
+
+  New functions defined in UserKernel:
+    - private int AlloFileDescr()
+        : Allocate a new file descriptor.
+        : Find a vacancy in the FileDescr array and return, return -1 if none 
+          exists.
+    - private boolean checkDescr(int a)
+        : Check if a is a valid file descriptor, e.g. a corresponds to an opened
+          file.
+    - private int handleOpen, handleClose, handleOpen, handleRead, handleWrite,
+      handleUnlink
+        : Implements the functions as in syscall.h.
+
+  Modification to functions in UserProcess:
+    - UserProcess()
+        : Initilize the FileDescr array: set 0, 1 as the stdin, stdout.
+
+. Test cases from c-level
+  - Read and write from consoles (keyboards, terminal)
+      : Create a process that echos the input from keyboard.
+      : The purpose is to test whether stdin, stdout is correctly set.
+  - Read and write from files (keyboards, terminal)
+      : Create a process that creates a file, write certain contents into it, and 
+        read the whole file to print it on the screen.
+      : The purpose is to test the basic functionalities of create, read, etc.
+
+
 . Vitual memory allocation
   Using a list to store all the free physical page in UserKernel class and also
   a lock to protect the mutex of the physical page allocation. API for
@@ -154,4 +192,25 @@
       : Creat an array with length 10 and try to read or write to array entry
         with index 20.
       : The purpose is to test the error of index out of range.
+
+. Lottery Scheduler 
+  The current implementation follows almost naturally from the priority scheduler
+  last time with the following modification:
+  
+  - newThreadState
+      : Has the same functionality as ThreadState, but used in the lottery 
+        scheduler.
+  - newThreadState.ticket
+      : Caches the number of tickets one process holds.
+  - newThreadState.updateLottery()
+      : Like updateEffectivePriority(), calculates the ticket transfer and updates
+        newThreadState.ticket.
+      : It is assumed that the initial ticket number equals to the priority (with
+        minimum 1).
+ - LotteryQueue.poll2()
+      : Holds a lottery among the waiting tickets, returns the winner (null if no
+        one is waiting).
+ - LotteryQueue.SumTicket()
+      : Calculate the total number of tickets in the waiting queue waitPQueue (see 
+        doc1.txt for the implementation of waitPQueue in PriorityQueue).
 
