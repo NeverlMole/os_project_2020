@@ -28,12 +28,10 @@
           pageAllocationLock.
 
   Modification to functions in UserProcess:
-    - UserProcess()
-        : Remove the initiliation for pageTable.
     - loadSection()
-        : Check the number of available pages is enough.
         : Add the allocation of physical memory using UserKernel.allocatePage()
-          and set pageTable accordingly.
+          and set pageTable accordingly. Return false if no free page lefts and
+          also free the pages allocated.
         : Load the section to the accoresponding physical page according to
           pageTable and also change the mark of readOnly according to the mark
           of section.
@@ -41,6 +39,7 @@
         : Modify the physical address according to pageTable.
     - writeVirtualMemory(int, byte[], int, int)
         : Modify the physical address according to pageTable.
+        : Not allow to write to read-only pages.
 
 . System call halt
   Use a flag isRoot to represent whether a process is root process and return
@@ -61,13 +60,13 @@
   terminated if it is the last process. The function is also used in
   handleSyscall and handleException for abnormal cases.
 
-  For join, we use childProcesses to check whether the pid is valid for join
+  For join, we use childList to check whether the pid is valid for join
   and use join() from thread to do it.
 
   New variables defined in UserProcess:
     - private int processID
     - private static int nextProcessID
-    - private list<UserProcess> childProcesses
+    - private list<UserProcess> childList
         : stored all its child Processes.
     - private static int numRunningProcess
     - private int returnStatus
@@ -79,6 +78,8 @@
   Modification to functions in UserProcess:
     - execute(String, String[])
         : Initialize this.thread.
+        : Init processID and isRoot.
+        : Update nextProcessID and numRunningProcess.
     - unloadSections()
         : Free all the memory page allocated by UserKernel.freePage().
 
@@ -88,7 +89,7 @@
           argc is non-negative.
         : Create a new UserProcess and run UserProcess.execute() to execute the
           new process. If not succeed, return -1.
-        : Update the childProcesses.
+        : Update the childList.
         : Return the new process ID.
     - private void finish()
         : Close coff, file descriptors.
@@ -96,41 +97,53 @@
         : Run this.thread.finish() if the process is not the last one.
         : Run UserKernel.terminate() if the process is the last one.
         : Check the function never return.
-    - private int handleExit(int status)
+    - private void handleExit(int status)
         : Set nonmallyExit to true and set returnStatus to status.
         : Run this.finish().
     - private int handleJoin(int pid, int statusAddr)
-        : Find the child process with pid in childProcesses. Return -1 if not
+        : Find the child process with pid in childList. Return -1 if not
           find. If find, denote the child process as child.
         : Run child.thread.join().
         : If the child exit normally, write child.returnStatus to statusAddr
           by writeVirtualMemory and return 1.
-        : If the child exit abnormally or the write to memory fails, return 0.
+        : If the child exit abnormally, return 0.
 
 . Test cases from Java-level
-  - Memory read and write test in UserProcess.memoryTest()
+  - Memory allocate, free, read and write test in UserProcess.memoryTest()
       : Create a new process and use UserKernel.allocatePage() to allocate
         several pages. Some pages have label read only.
       : Write values to valid memory using writeVirtualMemory and read the
         values using readVirtualMemory.
       : Write values to read only pages.
       : Read from and write to invalid virtual memory.
-      : The purpose is to test read and write functions.
-
-  - Memory allocation and free test in UserProcess.allocationTest()
-      : Create several processes, load them, and finish them in different
-        orders.
-      : Check how the memory is allocated and freed using debug information.
-      : The purpose is to test the memory allocation and free of a process.
+      : Free the pages and also try some illegal cases.
+      : The purpose is to test allocate, free, read and write functions.
 
 . Test cases from c-level
+  - Exec test in exec.c
+      : Run different code via exec.c.
+      : The purpose is to test whether exec system call is correctly coded.
+        Also, it can be used to other following test processes.
+
   - Halt test in halt.c
       : Create a non-root process and let it execute halt.c.
-      : The purpose is to test whether the non-root process can execute halt.
+      : The purpose is to test whether the non-root process can execute halt
+        and also the exec system call.
 
   - Echo test in echo.c
       : Create a process and execute echo.c with different parameters.
       : The purpose is to test whether a process can read its parameters.
+
+  - Exec/join/exit test in exec_join.c, exit.c and abExit.coff
+      : exit.c runs exit() with different status given by process arguments.
+      : abExit.coff is a file with random code which causes the unhandled
+        exception.
+      : exec_join.c executes exit.c with different arguments, execute
+        abExit.coff and executes with bad parameters. Then print their process
+        id or -1 for the cases of execution fail.
+      : exe_join.c then join the child process id and also join a non-child
+        process id. Then, print the return values and status.
+      : The purpose is to test all the return cases for exec and join.
 
   - Read and Write memory test in fib.c
       : Compute fibonacci sequence in fib.c using an array.
@@ -142,13 +155,3 @@
         with index 20.
       : The purpose is to test the error of index out of range.
 
-  - Exec/join/exit test in exec_join.c, exit.c and abExit.coff
-      : exit.c runs exit() with status given by process arguments.
-      : abExit.coff is a file with random code which causes the unhandled
-        exception.
-      : exec_join.c executes exit.c with different arguments, execute
-        abExit.coff and executes with bad parameters. Then print their process
-        id or -1 for the cases of execution fail.
-      : exe_join.c then join the child process id and also join a non-child
-        process id. Then, print the return values and status.
-      : The purpose is to test all the return cases for exec and join.
