@@ -10,7 +10,7 @@
         : the list of all free physical pages.
     - private boolean[] isPageUsed
         : represented where a physical page is used.
-    - private lock pageAllocation
+    - private lock pageAllocationLock
         : lock for page allocation.
 
   New functions defined in UserKernel:
@@ -24,7 +24,8 @@
 
   Modification to functions in UserKernel:
     - initialize(String)
-        : Add initilization for freePageList, isPageUsed and pageAllocation.
+        : Add initilization for freePageList, isPageUsed and
+          pageAllocationLock.
 
   Modification to functions in UserProcess:
     - UserProcess()
@@ -105,3 +106,49 @@
         : If the child exit normally, write child.returnStatus to statusAddr
           by writeVirtualMemory and return 1.
         : If the child exit abnormally or the write to memory fails, return 0.
+
+. Test cases from Java-level
+  - Memory read and write test in UserProcess.memoryTest()
+      : Create a new process and use UserKernel.allocatePage() to allocate
+        several pages. Some pages have label read only.
+      : Write values to valid memory using writeVirtualMemory and read the
+        values using readVirtualMemory.
+      : Write values to read only pages.
+      : Read from and write to invalid virtual memory.
+      : The purpose is to test read and write functions.
+
+  - Memory allocation and free test in UserProcess.allocationTest()
+      : Create several processes, load them, and finish them in different
+        orders.
+      : Check how the memory is allocated and freed using debug information.
+      : The purpose is to test the memory allocation and free of a process.
+
+. Test cases from c-level
+  - Halt test in halt.c
+      : Create a non-root process and let it execute halt.c.
+      : The purpose is to test whether the non-root process can execute halt.
+
+  - Echo test in echo.c
+      : Create a process and execute echo.c with different parameters.
+      : The purpose is to test whether a process can read its parameters.
+
+  - Read and Write memory test in fib.c
+      : Compute fibonacci sequence in fib.c using an array.
+      : The purpose is to test whether a process can read and write from
+        an array.
+
+  - Array index test in array.c
+      : Creat an array with length 10 and try to read or write to array entry
+        with index 20.
+      : The purpose is to test the error of index out of range.
+
+  - Exec/join/exit test in exec_join.c, exit.c and abExit.coff
+      : exit.c runs exit() with status given by process arguments.
+      : abExit.coff is a file with random code which causes the unhandled
+        exception.
+      : exec_join.c executes exit.c with different arguments, execute
+        abExit.coff and executes with bad parameters. Then print their process
+        id or -1 for the cases of execution fail.
+      : exe_join.c then join the child process id and also join a non-child
+        process id. Then, print the return values and status.
+      : The purpose is to test all the return cases for exec and join.
