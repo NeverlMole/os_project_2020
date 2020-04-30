@@ -442,6 +442,7 @@ public class UserProcess {
     if (!isRoot) {
       return 0;
     }
+
     Machine.halt();
 
     Lib.assertNotReached("Machine.halt() did not halt machine!");
@@ -646,10 +647,10 @@ public class UserProcess {
       return handleCreate(a0);
     case syscallOpen:
       return handleOpen(a0);
-    case syscallRead:
-      return handleRead(a0,a1,a2);
     case syscallWrite:
       return handleWrite(a0,a1,a2);
+    case syscallRead:
+      return handleRead(a0,a1,a2);
     case syscallClose:
       return handleClose(a0);
     case syscallUnlink:
@@ -818,6 +819,10 @@ public class UserProcess {
   private int initialPC, initialSP;
   private int argc, argv;
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> UserProcess.java: remove flag and pflag
   private static final int pageSize = Processor.pageSize;
   private static final char dbgProcess = 'a';
 
