@@ -5,6 +5,8 @@ import nachos.threads.*;
 import nachos.userprog.*;
 
 import java.io.EOFException;
+import java.util.Iterator;
+import java.util.LinkedList;
 
 /**
  * Encapsulates the state of a user process that is not contained in its
@@ -23,18 +25,13 @@ public class UserProcess {
    * Allocate a new process.
    */
   public UserProcess() {
-    int numPhysPages = Machine.processor().getNumPhysPages();
-    pageTable = new TranslationEntry[numPhysPages];
-    for (int i = 0; i < numPhysPages; i++)
-      pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
-
-    /***********************************************/
-    for(int i=0; i<16; i++) FileDescr[i] = null;
+    for(int i=0; i<16; i++) {
+      FileDescr[i] = null;
+    }
     FileDescr[0] = UserKernel.console.openForReading();
     FileDescr[1] = UserKernel.console.openForWriting();
     pflag = flag;
     flag = false;
-    /***********************************************/
   }
 
   /**
@@ -60,7 +57,24 @@ public class UserProcess {
     if (!load(name, args))
       return false;
 
-    new UThread(this).setName(name).fork();
+    thread = new UThread(this);
+    thread.setName(name).fork();
+
+    // init processID.
+    processID = nextProcessID;
+    nextProcessID += 1;
+    numRunningProcess += 1;
+    if (processID == 0) {
+      isRoot = true;
+    }
+
+    // init childList
+    childList = new LinkedList<UserProcess>();
+
+    Lib.debug(dbgProcess, "Exec " + name + " with the following arguments:");
+    for (int i = 0; i < args.length; i++) {
+      Lib.debug(dbgProcess, " - " + args[i]);
+    }
 
     return true;
   }
@@ -104,6 +118,19 @@ public class UserProcess {
     }
 
     return null;
+  }
+
+  /**
+   * Read an memory address from a virtual memory address. Return -1 if fails.
+   */
+  public int readVirtualMemoryAddr(int vaddr) {
+    byte[] tmp=new byte[AddrMemoryLength];
+
+    if (readVirtualMemory(vaddr, tmp) != AddrMemoryLength) {
+      return -1;
+    }
+
+    return Lib.bytesToInt(tmp, 0);
   }
 
   /**
@@ -327,6 +354,7 @@ public class UserProcess {
    * @return	<tt>true</tt> if the sections were successfully loaded.
    */
   protected boolean loadSections() {
+    pageTable = new TranslationEntry[numPages];
     for (int i = 0; i < numPages; i++) {
       int ppn = UserKernel.allocatePage();
 
@@ -364,7 +392,27 @@ public class UserProcess {
   /**
    * Release any resources allocated by <tt>loadSections()</tt>.
    */
-  protected void unloadSections() {}
+  protected void unloadSections() {
+    for (int i = 0; i < numPages; i++) {
+      UserKernel.freePage(pageTable[i].ppn);
+    }
+  }
+
+  private void finish() {
+    coff.close();
+    unloadSections();
+
+    if (numRunningProcess == 1) {
+      Lib.debug(dbgProcess,
+                "Kernel terminated because of the last process finished.");
+      UserKernel.kernel.terminate();
+    } else {
+      numRunningProcess -= 1;
+      thread.finish();
+    }
+
+    Lib.assertNotReached("Process did not exit after finished.");
+  }
 
   /**
    * Initialize the processor's registers in preparation for running the
@@ -390,15 +438,12 @@ public class UserProcess {
   }
 
 
-  private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
-                           syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
-                           syscallRead = 6, syscallWrite = 7, syscallClose = 8,
-                           syscallUnlink = 9;
-
-/***************************************************************************************************************/
 /* New codes for halt, create, open, read, write, close, unlink between these lines*/
 
   private int handleHalt() {
+    if (!isRoot) {
+      return 0;
+    }
 
     if(pflag) Machine.halt();
 
@@ -430,7 +475,7 @@ public class UserProcess {
     FileDescr[loc] = newFile;
     return loc;
   }
-  
+
   private int handleRead(int a0, int a1, int a2) {
     Lib.debug(dbgProcess, "UserProcess.Read()");
     if (!checkDescr(a0)) return -1;
@@ -444,12 +489,11 @@ public class UserProcess {
     return trywrite;
   }
 
-  
   private int handleWrite(int a0, int a1, int a2) {
     Lib.debug(dbgProcess, "UserProcess.Write()");
     if (!checkDescr(a0)) return -1;
     byte[] buff = new byte[a2];
-    
+
     int tryread = readVirtualMemory(a1, buff);
     if(tryread == -1){ 
       Lib.debug(dbgProcess, "\tload failed");
@@ -498,10 +542,76 @@ public class UserProcess {
     Lib.debug(dbgProcess, "\ttoo many files");
     return -1;
   }
- 
-  private OpenFile[] FileDescr = new OpenFile[16];
 
-/***************************************************************************************************************/
+
+  /**
+   * Handle the exec() system call.
+   */
+  private int handleExec(int fileAddr, int argc, int argvAddr) {
+    if (argc < 0) {
+      return -1;
+    }
+
+    String file = readVirtualMemoryString(fileAddr, MaxArgLength);
+    String[] args = new String[argc];
+
+    for(int i = 0; i < argc ;i++) {
+      int argaddr = readVirtualMemoryAddr(argvAddr + AddrMemoryLength * i);
+      args[i] = readVirtualMemoryString(argaddr, MaxArgLength);
+    }
+
+    UserProcess process = UserProcess.newUserProcess();
+
+    if (!process.execute(file, args)) {
+      return -1;
+    }
+
+    childList.add(process);
+
+    return process.processID;
+  }
+
+  /**
+   * Handle the exit() system call.
+   */
+  private int handleExit(int status) {
+    normallyExit = true;
+    returnStatus = status;
+    finish();
+    return 0;
+  }
+
+  /**
+   * Handle the join() system call.
+   */
+  private int handleJoin(int pid, int statusAddr) {
+    UserProcess cprocess = null;
+
+    for (Iterator it = childList.iterator(); it.hasNext();) {
+      UserProcess process = (UserProcess) it.next();
+      if (process.processID == pid) {
+        cprocess = process;
+      }
+    }
+
+    if (cprocess == null) {
+      return -1;
+    }
+
+    cprocess.thread.join();
+
+    if (!cprocess.normallyExit) {
+      return 0;
+    }
+
+    writeVirtualMemory(statusAddr, Lib.bytesFromInt(cprocess.returnStatus));
+    return 1;
+  }
+
+  private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
+                           syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
+                           syscallRead = 6, syscallWrite = 7, syscallClose = 8,
+                           syscallUnlink = 9;
 
   /**
    * Handle a syscall exception. Called by <tt>handleException()</tt>. The
@@ -535,7 +645,6 @@ public class UserProcess {
     switch (syscall) {
     case syscallHalt:
       return handleHalt();
-/*****************************************/
     case syscallCreate:
       return handleCreate(a0);
     case syscallOpen:
@@ -548,9 +657,16 @@ public class UserProcess {
       return handleClose(a0);
     case syscallUnlink:
       return handleUnlink(a0);
-/*****************************************/
+    case syscallExit:
+      return handleExit(a0);
+    case syscallExec:
+      return handleExec(a0, a1, a2);
+    case syscallJoin:
+      return handleJoin(a0, a1);
+
     default:
       Lib.debug(dbgProcess, "Unknown syscall " + syscall);
+      finish();
       Lib.assertNotReached("Unknown system call!");
     }
     return 0;
@@ -581,6 +697,7 @@ public class UserProcess {
     default:
       Lib.debug(dbgProcess,
                 "Unexpected exception: " + Processor.exceptionNames[cause]);
+      finish();
       Lib.assertNotReached("Unexpected exception");
     }
   }
@@ -592,6 +709,8 @@ public class UserProcess {
     UserProcess process = UserProcess.newUserProcess();
 
     process.numPages = 5;
+
+    process.pageTable = new TranslationEntry[5];
 
     for (int i = 0; i < process.numPages; i++) {
       int ppn = UserKernel.allocatePage();
@@ -707,4 +826,26 @@ public class UserProcess {
   private boolean pflag;
   private static final int pageSize = Processor.pageSize;
   private static final char dbgProcess = 'a';
+
+  /** variables for dealing root process and process id. */
+  private boolean isRoot = false;
+  private int processID;
+  private static int nextProcessID = 0;
+  private static int numRunningProcess = 0;
+
+  /** the thread associated with the process. */
+  private UThread thread;
+
+  /** child processes of a the process. */
+  private LinkedList<UserProcess> childList;
+
+  /** return states. */
+  private int returnStatus;
+  private boolean normallyExit = false;
+
+  /** file descriptors. */
+  private OpenFile[] FileDescr = new OpenFile[16];
+
+  private static final int AddrMemoryLength = 4;
+  private static final int MaxArgLength = 256;
 }

@@ -46,7 +46,7 @@ public class UserKernel extends ThreadedKernel {
   public void selfTest() {
     super.selfTest();
 
-    UserProcess.selfTest();
+    //UserProcess.selfTest();
 
     System.out.println("Testing the console device. Typed characters");
     System.out.println("will be echoed until q is typed.");
@@ -90,6 +90,7 @@ public class UserKernel extends ThreadedKernel {
     Lib.assertTrue(KThread.currentThread() instanceof UThread);
 
     UserProcess process = ((UThread)KThread.currentThread()).process;
+
     int cause = Machine.processor().readRegister(Processor.regCause);
     process.handleException(cause);
   }
@@ -156,6 +157,7 @@ public class UserKernel extends ThreadedKernel {
   /**
    * Terminate this kernel. Never returns.
    */
+
   public void terminate() { super.terminate(); }
 
   /** Globally accessible reference to the synchronized console. */
