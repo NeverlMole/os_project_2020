@@ -179,7 +179,7 @@
       : exec_join.c executes exit.c with different arguments, execute
         abExit.coff and executes with bad parameters. Then print their process
         id or -1 for the cases of execution fail.
-      : exe_join.c then join the child process id and also join a non-child
+      : exec_join.c then join the child process id and also join a non-child
         process id. Then, print the return values and status.
       : The purpose is to test all the return cases for exec and join.
 
