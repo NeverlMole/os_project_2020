@@ -32,8 +32,9 @@ public class UserProcess {
     for(int i=0; i<16; i++) FileDescr[i] = null;
     FileDescr[0] = UserKernel.console.openForReading();
     FileDescr[1] = UserKernel.console.openForWriting();
+    pflag = flag;
+    flag = false;
     /***********************************************/
-
   }
 
   /**
@@ -338,16 +339,6 @@ public class UserProcess {
     processor.writeRegister(Processor.regA1, argv);
   }
 
-  /**
-   * Handle the halt() system call.
-   */
-  private int handleHalt() {
-
-    Machine.halt();
-
-    Lib.assertNotReached("Machine.halt() did not halt machine!");
-    return 0;
-  }
 
   private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
                            syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
@@ -355,7 +346,15 @@ public class UserProcess {
                            syscallUnlink = 9;
 
 /***************************************************************************************************************/
-/* New codes for create, open, read, write, close, unlink between these lines*/
+/* New codes for halt, create, open, read, write, close, unlink between these lines*/
+
+  private int handleHalt() {
+
+    if(pflag) Machine.halt();
+
+    Lib.assertNotReached("Machine.halt() did not halt machine!");
+    return 0;
+  }
 
   private int handleCreate(int a0) {
     return handleCO(a0, true);
@@ -365,8 +364,8 @@ public class UserProcess {
   }
 
   private int handleCO(int a0, boolean crea){
-    String Filename = readVirtualMemoryString(a0, 255);
-    Lib.debug(dbgProcess, "UserProcess.Create(\"" + Filename + "\")");
+    String Filename = readVirtualMemoryString(a0, 256);
+    Lib.debug(dbgProcess, "UserProcess.CO(\"" + Filename + "\")");
     if(Filename == null) {
       Lib.debug(dbgProcess, "\tfilename empty");
       return -1;
@@ -383,6 +382,7 @@ public class UserProcess {
   }
   
   private int handleRead(int a0, int a1, int a2) {
+    Lib.debug(dbgProcess, "UserProcess.Read()");
     if (!checkDescr(a0)) return -1;
     byte[] buff = new byte[a2];
     int tryread = FileDescr[a0].read(buff, 0, a2);
@@ -394,9 +394,12 @@ public class UserProcess {
     return trywrite;
   }
 
+  
   private int handleWrite(int a0, int a1, int a2) {
+    Lib.debug(dbgProcess, "UserProcess.Write()");
     if (!checkDescr(a0)) return -1;
     byte[] buff = new byte[a2];
+    
     int tryread = readVirtualMemory(a1, buff);
     if(tryread == -1){ 
       Lib.debug(dbgProcess, "\tload failed");
@@ -411,6 +414,7 @@ public class UserProcess {
   }
 
   private int handleClose(int a0) {
+    Lib.debug(dbgProcess, "UserProcess.close()");
     if (!checkDescr(a0)) return -1;
     FileDescr[a0].close();
     FileDescr[a0] = null;
@@ -419,6 +423,7 @@ public class UserProcess {
 
   private int handleUnlink(int a0) {
     String Filename = readVirtualMemoryString(a0, 255);
+    Lib.debug(dbgProcess, "UserProcess.Unlink(\"" + Filename + "\")");
     if (Filename == null) return 0;
     boolean res = ThreadedKernel.fileSystem.remove(Filename);
     if(res) return 0; else return -1;
@@ -544,6 +549,9 @@ public class UserProcess {
   private int initialPC, initialSP;
   private int argc, argv;
 
+
+  private static boolean flag = true;
+  private boolean pflag;
   private static final int pageSize = Processor.pageSize;
   private static final char dbgProcess = 'a';
 }
