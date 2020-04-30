@@ -27,6 +27,13 @@ public class UserProcess {
     pageTable = new TranslationEntry[numPhysPages];
     for (int i = 0; i < numPhysPages; i++)
       pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
+
+    /***********************************************/
+    for(int i=0; i<16; i++) FileDescr[i] = null;
+    FileDescr[0] = UserKernel.console.openForReading();
+    FileDescr[1] = UserKernel.console.openForWriting();
+    /***********************************************/
+
   }
 
   /**
@@ -347,6 +354,100 @@ public class UserProcess {
                            syscallRead = 6, syscallWrite = 7, syscallClose = 8,
                            syscallUnlink = 9;
 
+/***************************************************************************************************************/
+/* New codes for create, open, read, write, close, unlink between these lines*/
+
+  private int handleCreate(int a0) {
+    return handleCO(a0, true);
+  }
+  private int handleOpen(int a0) {
+    return handleCO(a0, false);
+  }
+
+  private int handleCO(int a0, boolean crea){
+    String Filename = readVirtualMemoryString(a0, 255);
+    Lib.debug(dbgProcess, "UserProcess.Create(\"" + Filename + "\")");
+    if(Filename == null) {
+      Lib.debug(dbgProcess, "\tfilename empty");
+      return -1;
+    }
+    int loc = AlloFileDescr();
+    if(loc == -1) return -1;
+    OpenFile newFile = ThreadedKernel.fileSystem.open(Filename, crea);
+    if (newFile == null) {
+      Lib.debug(dbgProcess, "\tcreate failed");
+      return -1;
+    }
+    FileDescr[loc] = newFile;
+    return loc;
+  }
+  
+  private int handleRead(int a0, int a1, int a2) {
+    if (!checkDescr(a0)) return -1;
+    byte[] buff = new byte[a2];
+    int tryread = FileDescr[a0].read(buff, 0, a2);
+    if(tryread == -1){ 
+      Lib.debug(dbgProcess, "\tread failed");
+      return -1;
+    }
+    int trywrite = writeVirtualMemory(a1, buff);
+    return trywrite;
+  }
+
+  private int handleWrite(int a0, int a1, int a2) {
+    if (!checkDescr(a0)) return -1;
+    byte[] buff = new byte[a2];
+    int tryread = readVirtualMemory(a1, buff);
+    if(tryread == -1){ 
+      Lib.debug(dbgProcess, "\tload failed");
+      return -1;
+    }
+    int trywrite = FileDescr[a0].write(buff, 0, a2);
+    if(trywrite < a2){ 
+      Lib.debug(dbgProcess, "\twrite incomplete");
+      return -1;
+    }
+    return trywrite;
+  }
+
+  private int handleClose(int a0) {
+    if (!checkDescr(a0)) return -1;
+    FileDescr[a0].close();
+    FileDescr[a0] = null;
+    return 0;
+  }
+
+  private int handleUnlink(int a0) {
+    String Filename = readVirtualMemoryString(a0, 255);
+    if (Filename == null) return 0;
+    boolean res = ThreadedKernel.fileSystem.remove(Filename);
+    if(res) return 0; else return -1;
+  }
+
+  private boolean checkDescr(int a0){
+    if (a0*(15-a0)<0){
+      Lib.debug(dbgProcess, "\tinvalid descriptor");
+      return false;
+    }
+    if (FileDescr[a0] == null){
+      Lib.debug(dbgProcess, "\tnull descriptor");
+      return false;
+    }
+    return true;
+  }
+
+
+  private int AlloFileDescr(){
+    for(int i=0; i<16; i++)
+      if(FileDescr[i]==null) return i;
+    Lib.debug(dbgProcess, "\ttoo many files");
+    return -1;
+  }
+ 
+  private OpenFile[] FileDescr = new OpenFile[16];
+
+/***************************************************************************************************************/
+
   /**
    * Handle a syscall exception. Called by <tt>handleException()</tt>. The
    * <i>syscall</i> argument identifies which syscall the user executed:
@@ -379,7 +480,20 @@ public class UserProcess {
     switch (syscall) {
     case syscallHalt:
       return handleHalt();
-
+/*****************************************/
+    case syscallCreate:
+      return handleCreate(a0);
+    case syscallOpen:
+      return handleOpen(a0);
+    case syscallRead:
+      return handleRead(a0,a1,a2);
+    case syscallWrite:
+      return handleWrite(a0,a1,a2);
+    case syscallClose:
+      return handleClose(a0);
+    case syscallUnlink:
+      return handleUnlink(a0);
+/*****************************************/
     default:
       Lib.debug(dbgProcess, "Unknown syscall " + syscall);
       Lib.assertNotReached("Unknown system call!");
