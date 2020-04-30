@@ -819,10 +819,6 @@ public class UserProcess {
   private int initialPC, initialSP;
   private int argc, argv;
 
-<<<<<<< HEAD
-=======
-
->>>>>>> UserProcess.java: remove flag and pflag
   private static final int pageSize = Processor.pageSize;
   private static final char dbgProcess = 'a';
 

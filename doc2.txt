@@ -1,3 +1,4 @@
+
 . File system call implementation
   Using an array to store the file descriptor correspondence in the UserProcess 
   class. APIs for file opening, closing and removing are provided in 
@@ -25,9 +26,6 @@
   Modification to functions in UserProcess:
     - UserProcess()
         : Initilize the FileDescr array: set 0, 1 as the stdin, stdout.
-
-. Test cases from c-level
-
 
 . Vitual memory allocation
   Using a list to store all the free physical page in UserKernel class and also
