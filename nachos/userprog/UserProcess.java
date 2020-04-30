@@ -30,8 +30,6 @@ public class UserProcess {
     }
     FileDescr[0] = UserKernel.console.openForReading();
     FileDescr[1] = UserKernel.console.openForWriting();
-    pflag = flag;
-    flag = false;
   }
 
   /**
@@ -444,8 +442,7 @@ public class UserProcess {
     if (!isRoot) {
       return 0;
     }
-
-    if(pflag) Machine.halt();
+    Machine.halt();
 
     Lib.assertNotReached("Machine.halt() did not halt machine!");
     return 0;
@@ -508,7 +505,7 @@ public class UserProcess {
   }
 
   private int handleClose(int a0) {
-    Lib.debug(dbgProcess, "UserProcess.close()");
+    Lib.debug(dbgProcess, "UserProcess.Close()");
     if (!checkDescr(a0)) return -1;
     FileDescr[a0].close();
     FileDescr[a0] = null;
@@ -821,9 +818,6 @@ public class UserProcess {
   private int initialPC, initialSP;
   private int argc, argv;
 
-
-  private static boolean flag = true;
-  private boolean pflag;
   private static final int pageSize = Processor.pageSize;
   private static final char dbgProcess = 'a';
 
