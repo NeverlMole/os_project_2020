@@ -136,14 +136,32 @@ public class UserProcess {
     Lib.assertTrue(offset >= 0 && length >= 0 &&
                    offset + length <= data.length);
 
+    if (vaddr < 0) {
+      return 0;
+    }
+
+    int vpn = Processor.pageFromAddress(vaddr);
+    int offsetv = Processor.offsetFromAddress(vaddr);
+
     byte[] memory = Machine.processor().getMemory();
 
-    // for now, just assume that virtual addresses equal physical addresses
-    if (vaddr < 0 || vaddr >= memory.length)
-      return 0;
+    int amount = 0;
 
-    int amount = Math.min(length, memory.length - vaddr);
-    System.arraycopy(memory, vaddr, data, offset, amount);
+    while (vpn < numPages) {
+      int copyLength = Math.min(pageSize - offsetv, length);
+      int copyAddr = Processor.makeAddress(pageTable[vpn].ppn, offsetv);
+
+      System.arraycopy(memory, copyAddr, data, offset + amount, copyLength);
+
+      amount += copyLength;
+      vpn += 1;
+      offsetv = 0;
+      length -= copyLength;
+
+      if (length == 0) {
+        break;
+      }
+    }
 
     return amount;
   }
@@ -180,14 +198,36 @@ public class UserProcess {
     Lib.assertTrue(offset >= 0 && length >= 0 &&
                    offset + length <= data.length);
 
+    if (vaddr < 0) {
+      return 0;
+    }
+
+    int vpn = Processor.pageFromAddress(vaddr);
+    int offsetv = Processor.offsetFromAddress(vaddr);
+
     byte[] memory = Machine.processor().getMemory();
 
-    // for now, just assume that virtual addresses equal physical addresses
-    if (vaddr < 0 || vaddr >= memory.length)
-      return 0;
+    int amount = 0;
 
-    int amount = Math.min(length, memory.length - vaddr);
-    System.arraycopy(data, offset, memory, vaddr, amount);
+    while (vpn < numPages) {
+      if (pageTable[vpn].readOnly) {
+        break;
+      }
+
+      int copyLength = Math.min(pageSize - offsetv, length);
+      int copyAddr = Processor.makeAddress(pageTable[vpn].ppn, offsetv);
+
+      System.arraycopy(data, offset + amount, memory, copyAddr, copyLength);
+
+      amount += copyLength;
+      vpn += 1;
+      offsetv = 0;
+      length -= copyLength;
+
+      if (length == 0) {
+        break;
+      }
+    }
 
     return amount;
   }
@@ -287,10 +327,19 @@ public class UserProcess {
    * @return	<tt>true</tt> if the sections were successfully loaded.
    */
   protected boolean loadSections() {
-    if (numPages > Machine.processor().getNumPhysPages()) {
-      coff.close();
-      Lib.debug(dbgProcess, "\tinsufficient physical memory");
-      return false;
+    for (int i = 0; i < numPages; i++) {
+      int ppn = UserKernel.allocatePage();
+
+      if (ppn == -1) {
+        Lib.debug(dbgProcess, "\tinsufficient physical memory");
+        i -= 1;
+        while (i >= 0) {
+          UserKernel.freePage(pageTable[i].ppn);
+        }
+        return false;
+      }
+
+      pageTable[i] = new TranslationEntry(i, ppn, true, false, false, false);
     }
 
     // load sections
@@ -298,13 +347,14 @@ public class UserProcess {
       CoffSection section = coff.getSection(s);
 
       Lib.debug(dbgProcess, "\tinitializing " + section.getName() +
-                                " section (" + section.getLength() + " pages)");
+                              " section (" + section.getLength() + " pages)");
 
       for (int i = 0; i < section.getLength(); i++) {
         int vpn = section.getFirstVPN() + i;
+        pageTable[vpn].readOnly = section.isReadOnly();
 
         // for now, just assume virtual addresses=physical addresses
-        section.loadPage(i, vpn);
+        section.loadPage(i, pageTable[vpn].ppn);
       }
     }
 
@@ -533,6 +583,109 @@ public class UserProcess {
                 "Unexpected exception: " + Processor.exceptionNames[cause]);
       Lib.assertNotReached("Unexpected exception");
     }
+  }
+
+  /** Selftest. */
+
+  public static void memoryTest() {
+    System.out.println("Enter memoryTest for UserPrcross.");
+    UserProcess process = UserProcess.newUserProcess();
+
+    process.numPages = 5;
+
+    for (int i = 0; i < process.numPages; i++) {
+      int ppn = UserKernel.allocatePage();
+
+      Lib.assertTrue(ppn >= 0);
+
+      process.pageTable[i] =
+        new TranslationEntry(i, ppn, true, false, false, false);
+    }
+
+    process.pageTable[2].readOnly = true;
+
+    // Test normal read and write.
+    int voffset = 10;
+    int vpn = 0;
+    String mark = "Here Here!";
+    byte[] tmp = mark.getBytes();
+
+    int numbw = process.writeVirtualMemory(Processor.makeAddress(vpn, voffset),
+                                           tmp);
+
+    System.out.println("Write to (" + vpn + "," + voffset + ") string "
+                       + mark + " with " + numbw + ".");
+
+    byte[] tmp2 = new byte[5000];
+    int numbr = process.readVirtualMemory(Processor.makeAddress(vpn, voffset),
+        tmp2, 0, 500);
+
+    System.out.println("Read from (" + vpn + "," + voffset + ") " + numbr
+                       + " bits.");
+
+    // Test read and write to readonly pages.
+    voffset = pageSize - 5;
+    vpn = 1;
+
+    numbw = process.writeVirtualMemory(Processor.makeAddress(vpn, voffset),
+                                           tmp);
+
+    System.out.println("Write to (" + vpn + "," + voffset + ") string "
+                       + mark + " with " + numbw + ".");
+
+    numbr = process.readVirtualMemory(Processor.makeAddress(vpn, voffset),
+        tmp2, 0, 500);
+
+    System.out.println("Read from (" + vpn + "," + voffset + ") " + numbr
+                       + " bits .");
+
+    // Test read and write when out of virtul memory.
+    voffset = pageSize - 5;
+    vpn = 4;
+
+    numbw = process.writeVirtualMemory(Processor.makeAddress(vpn, voffset),
+                                           tmp);
+
+    System.out.println("Write to (" + vpn + "," + voffset + ") string "
+                       + mark + " with " + numbw + ".");
+
+    numbr = process.readVirtualMemory(Processor.makeAddress(vpn, voffset),
+        tmp2, 0, 500);
+
+    System.out.println("Read from (" + vpn + "," + voffset + ") " + numbr
+                       + " bits.");
+
+    mark = "";
+
+    for (int i = 0; i < 500; i++) {
+      mark = mark + i;
+    }
+    tmp = mark.getBytes();
+
+    // Test for long read and write.
+    voffset = 0;
+    vpn = 0;
+
+    numbw = process.writeVirtualMemory(Processor.makeAddress(vpn, voffset),
+                                           tmp);
+
+    System.out.println("Write to (" + vpn + "," + voffset + ") string "
+                       + mark + " with " + numbw + ".");
+
+    vpn += 1;
+    String sread = process.readVirtualMemoryString(
+        Processor.makeAddress(vpn, voffset), 2000);
+
+    System.out.println("Read from (" + vpn + "," + voffset + ") string "
+                       + sread);
+
+    for (int i = 0; i < process.numPages; i++) {
+      UserKernel.freePage(process.pageTable[i].ppn);
+    }
+  }
+
+  public static void selfTest() {
+    memoryTest();
   }
 
   /** The program being run by this process. */

@@ -4,6 +4,8 @@ import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 
+import java.util.LinkedList;
+
 /**
  * A kernel that can support multiple user processes.
  */
@@ -25,6 +27,17 @@ public class UserKernel extends ThreadedKernel {
     Machine.processor().setExceptionHandler(new Runnable() {
       public void run() { exceptionHandler(); }
     });
+
+    // initialization for memory allocation
+    pageAllocationLock = new Lock();
+    freePageList = new LinkedList<Integer>();
+
+    numPhysPages = Machine.processor().getNumPhysPages();
+    isPageUsed = new boolean[numPhysPages];
+    for (int i = 0; i < numPhysPages; i++) {
+      isPageUsed[i] = false;
+      freePageList.add(i);
+    }
   }
 
   /**
@@ -32,6 +45,8 @@ public class UserKernel extends ThreadedKernel {
    */
   public void selfTest() {
     super.selfTest();
+
+    UserProcess.selfTest();
 
     System.out.println("Testing the console device. Typed characters");
     System.out.println("will be echoed until q is typed.");
@@ -98,6 +113,47 @@ public class UserKernel extends ThreadedKernel {
   }
 
   /**
+   * Allocate physical page and return the page number. Return -1 if there is
+   * no free page.
+   */
+  public static int allocatePage() {
+    pageAllocationLock.acquire();
+
+    if (freePageList.size() == 0) {
+      return -1;
+    }
+
+    int ppn = freePageList.removeFirst();
+
+    Lib.assertTrue(0 <= ppn && ppn < numPhysPages && !isPageUsed[ppn]);
+
+    isPageUsed[ppn] = true;
+
+    pageAllocationLock.release();
+
+    Lib.debug(dbgProcess,
+              "Allocate page " + ppn + ".");
+    return ppn;
+  }
+
+  /**
+   * Free the physical page. The kernel will crash either when the page is
+   * not exists or the page is already freed.
+   */
+  public static void freePage(int ppn) {
+    pageAllocationLock.acquire();
+
+    Lib.assertTrue(0 <= ppn && ppn < numPhysPages && isPageUsed[ppn]);
+
+    isPageUsed[ppn] = false;
+    freePageList.add(ppn);
+
+    pageAllocationLock.release();
+    Lib.debug(dbgProcess,
+              "Free page " + ppn + ".");
+  }
+
+  /**
    * Terminate this kernel. Never returns.
    */
   public void terminate() { super.terminate(); }
@@ -107,4 +163,11 @@ public class UserKernel extends ThreadedKernel {
 
   // dummy variables to make javac smarter
   private static Coff dummy1 = null;
+
+  // variables for page allocation
+  private static LinkedList<Integer> freePageList;
+  private static boolean[] isPageUsed;
+  private static int numPhysPages;
+  private static Lock pageAllocationLock;
+  private static final char dbgProcess = 'a';
 }
