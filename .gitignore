@@ -4,3 +4,7 @@ nachos/proj2/*
 *.coff
 *.a
 *.o
+*.sum
+*.mod
+blockdb/vendor/*
+blockdb/main/main
