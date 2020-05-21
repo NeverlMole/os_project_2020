@@ -1,0 +1,79 @@
+. Server Package
+
+  Member variables:
+    - curStates AccountStates
+    - curLog list of Transactions
+
+  Major public member functions:
+    - Init()
+        : Read the blocks and logs from disk.
+        : Reapply all the transaction to get the curStates.
+        : Use the logs file from disk to init currentLog.
+        : Store the logs into a block on disk if the lenght of the logs is
+          equal to the size of a block.
+
+    - Get()
+        : Return the information from curStates.
+
+    - Apply(transaction)
+        : Try to apply the transaction to the current states. Return not
+          succeed if the transaction is invalid.
+        : Add the transaction to log and also write the log to disk.
+        : Return succeed if no error occurs.
+
+    - Other operation {Put, Deposit, ...}
+        : Generate a transaction accordingly and run Apply().
+
+. The main function main()
+  : Read the information from config.json.
+  : Create and init a server.
+  : Start the server.
+
+. Log Package
+
+  Major functions:
+    - ReadBlock()
+        : Read a block file.
+        : Check whether the block if valid. Return error if not valid.
+        : Return a log list of transactions from the block.
+    - ReadLog()
+        : Read all the valid log.
+    - WriteBlock()
+        : Turn a log with full-length into a block and write it to disk.
+    - WriteLog()
+        : Write a log term to disk.
+
+. Transaction Structure
+
+  Struct values:
+    - TransNum
+        : Indicate the transaction number. The i-th transaction should have
+          TransNum i.
+    - Type
+        : The transaction Type {PUT, DEPOSIT, WITHDRAW, TRANSFER}
+    - UserID
+        : The user id or from id of a transaction.
+    - Value
+    - ToID
+
+. AccountStates Structure
+  When a new user id is asked, create a new term in map with value 0. If a
+  user id is invalid, directly return an error.
+
+  Member variables:
+    - UserIDValueMap
+        : A map with user id as key and account balance as value.
+        : Initially empty.
+
+  Member functions:
+    - Apply(transaction)
+        : Apply a transaction accordingly.
+        : Return error if not succeed.
+    - Check(transaction)
+        : Similar to apply but does not apply the transaction.
+    - Get(userID)
+        : Return the balance of an given account.
+
+. Error
+  - InvalidUserID
+  - BalanceNotEnough
