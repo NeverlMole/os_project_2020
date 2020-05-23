@@ -8,3 +8,4 @@ nachos/proj2/*
 *.mod
 blockdb/vendor/*
 blockdb/main/main
+blockdb/tmp/*

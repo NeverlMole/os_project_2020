@@ -17,7 +17,7 @@ func (ac *AccountStates) Get(userID string) (int32, error) {
   return ac.data[userID], nil
 }
 
-func (ac *AccountStates) Apply(trans log_pb.Transaction) (bool, error) {
+func (ac *AccountStates) Apply(trans *log_pb.Transaction) error {
   /* TODO: check whether the userID is valid. If not return an error. */
   switch trans.Type {
   case log_pb.Transaction_PUT:
@@ -27,20 +27,43 @@ func (ac *AccountStates) Apply(trans log_pb.Transaction) (bool, error) {
   case log_pb.Transaction_WITHDRAW:
     if ac.data[trans.UserID] < trans.Value {
       /* TODO: return BalanceNotEnoughErr. */
-      return false, nil
+      return nil
     }
     ac.data[trans.UserID] -= trans.Value
   case log_pb.Transaction_TRANSFER:
     if ac.data[trans.FromID] < trans.Value {
       /* TODO: return BalanceNotEnoughErr. */
-      return false, nil
+      return nil
     }
     ac.data[trans.FromID] -= trans.Value
     ac.data[trans.ToID] += trans.Value
   default:
     /* TODO: return InvalidTransactionErr. */
-    return false, nil
+    return nil
   }
 
-  return true, nil
+  return nil
+}
+
+func (ac *AccountStates) Check(trans *log_pb.Transaction) error {
+  /* TODO: check whether the userID is valid. If not return an error. */
+  switch trans.Type {
+  case log_pb.Transaction_PUT:
+  case log_pb.Transaction_DEPOSIT:
+  case log_pb.Transaction_WITHDRAW:
+    if ac.data[trans.UserID] < trans.Value {
+      /* TODO: return BalanceNotEnoughErr. */
+      return nil
+    }
+  case log_pb.Transaction_TRANSFER:
+    if ac.data[trans.FromID] < trans.Value {
+      /* TODO: return BalanceNotEnoughErr. */
+      return nil
+    }
+  default:
+    /* TODO: return InvalidTransactionErr. */
+    return nil
+  }
+
+  return nil
 }

@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-const blockSize = 50
+const blockSize int32 = 50
 
 // Main function, RPC server initialization
 func main() {
