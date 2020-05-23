@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package log_pb;
+
+message Transaction {
+	enum Types {
+		UNKNOWN = 0;
+		GET = 1;
+		PUT = 2;
+		DEPOSIT = 3;
+		WITHDRAW = 4;
+		TRANSFER = 5;
+	}
+	Types Type = 1;
+	string UserID = 2; // Optional
+	string FromID = 3; // Optional
+	string ToID = 4; // Optional
+	int32 Value = 5;
+  int32 TransID = 6;
+  int32 OrderID = 7;
+}
+
+message Block {
+	int32 BlockID = 1;
+	string PrevHash = 2;
+	repeated Transaction Transactions = 3;
+	string Nonce = 4;
+}
