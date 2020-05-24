@@ -1,0 +1,9 @@
+. To compile or run the server
+  - First run the following commands to install the dependent packages.
+    $ go mod init blockdb_go
+    $ go mod tidy
+    $ go mod vendor
+  - Then run compile.sh
+    $ ./compile.sh
+  - To run the server
+    $ ./start.sh
