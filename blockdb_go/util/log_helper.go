@@ -43,6 +43,11 @@ func ProtobufWrite(dir string, msg proto.Message) error {
   return nil
 }
 
+func ProtobufToString(msg proto.Message) (string, error) {
+  m := jsonpb.Marshaler{}
+  return m.MarshalToString(msg)
+}
+
 func ProtobufRead(dir string, msg proto.Message) error {
   fo, err := os.Open(dir)
   if err != nil {

@@ -1,67 +1,49 @@
-. Server Package
-
-  Member variables:
-    - curStates AccountStates
-    - curLog list of Transactions
-
-  Major public member functions:
-    - Init()
-        : Read the blocks and logs from disk.
-        : Reapply all the transaction to get the curStates.
-        : Use the logs file from disk to init currentLog.
-        : Store the logs into a block on disk if the lenght of the logs is
-          equal to the size of a block.
-
-    - Get()
-        : Return the information from curStates.
-
-    - Apply(transaction)
-        : Try to apply the transaction to the current states. Return not
-          succeed if the transaction is invalid.
-        : Add the transaction to log and also write the log to disk.
-        : Return succeed if no error occurs.
-
-    - Other operation {Put, Deposit, ...}
-        : Generate a transaction accordingly and run Apply().
-
-. The main function main()
-  : Read the information from config.json.
-  : Create and init a server.
-  : Start the server.
+. Transaction Structure
+  Struct values:
+    - TransID
+        : Indicate the transaction number. The i-th transaction should have
+          TransID i.
+    - OrderID
+        : Indicate the transaction number for all stored transaction. The i-th
+          stored transaction should have OrderID i.
+    - Type
+    - UserID
+    - Value
+    - FromID
+    - ToID
 
 . Log Package
 
   Major functions:
     - ReadBlock()
         : Read a block file.
-        : Check whether the block if valid. Return error if not valid.
+        : Check whether the block if valid:
+            - BlockID is correct.
+            - Block length is currect.
+            - transactions have correct OrderID
+          Return error if not valid.
         : Return a log list of transactions from the block.
-    - ReadLog()
-        : Read all the valid log.
+    - ReadLogs()
+        : Read the log one by one from disk. The OrderID of the one-by-one
+          transactions from the logs should be consecutive. If the log file or
+          the transactions are not consecutive, return DataMissingErr.
+        : If there are invalid log file other than the last one, return
+          DataMissingErr.
+        : Otherwise, return the log.
     - WriteBlock()
-        : Turn a log with full-length into a block and write it to disk.
+        : Turn a list of log with full-length into a block and write it to
+          disk.
     - WriteLog()
-        : Write a log term to disk.
-
-. Transaction Structure
-
-  Struct values:
-    - TransNum
-        : Indicate the transaction number. The i-th transaction should have
-          TransNum i.
-    - Type
-        : The transaction Type {PUT, DEPOSIT, WITHDRAW, TRANSFER}
-    - UserID
-        : The user id or from id of a transaction.
-    - Value
-    - ToID
+        : Write a log term to the disk.
+    - CleanLogs()
+        : Remove all the logs in the disk in an decreasing order.
 
 . AccountStates Structure
   When a new user id is asked, create a new term in map with value 0. If a
   user id is invalid, directly return an error.
 
   Member variables:
-    - UserIDValueMap
+    - data map[string]int32
         : A map with user id as key and account balance as value.
         : Initially empty.
 
@@ -72,8 +54,67 @@
     - Check(transaction)
         : Similar to apply but does not apply the transaction.
     - Get(userID)
+        : Check whether the userID is valid. Return InvalidUserIDErr if not
+          valid.
         : Return the balance of an given account.
 
-. Error
-  - InvalidUserID
-  - BalanceNotEnough
+. Server Package
+
+  Member variables:
+    - curStates AccountStates
+    - curLog list of Transactions
+    - logLength
+
+  Major public member functions:
+    - Init()
+        : Read the blocks stored on disk one by one using log.ReadBlock(). If
+          valid, apply it to the curStates. If the apply does not succeed or
+          the block is invalid, which means the block is corrupted, then mark
+          the block as corrupted. If the block is corrupted or there is no new
+          block then stop.
+        : Read the logs using log.ReadLog() to curLog. If return error, then
+          the server stop with error. Otherwise, check whether the logs are
+          compatible with the blocks:
+            - If the previous block has marked corrupted, the logs have to be
+              of full length.
+            - The OrderID of the first log should be less than or equal to the
+              OrderID of the last log of the last valid block plused by 1.
+          If not compatible, return DataMissErr and stop the server.
+        : If the OrderID of the first log is less than the OrderID of the last log
+          of the last valid block plused by 1, set the curLog to empty. Remove
+          all the log file
+        : Reapply all the transaction in curLog to the curStates. If the apply
+          does not succeed, return DataMissErr.
+
+    - Get()
+        : Return the information from curStates.
+
+    - Apply(transaction)
+        : Try to apply the transaction to the current states. Return not
+          succeed if the transaction is invalid.
+        : Add the transaction to log and also write the log to disk.
+        : Store the log into block if log length is full.
+        : Change logLength accordingly.
+        : Return succeed if no error occurs.
+
+    - Other operation {Put, Deposit, ...}
+        : Generate a transaction accordingly and run Apply().
+
+. The main function main()
+  : Read the information from config.json.
+  : Create and init a server.
+  : Start the server.
+
+
+. Errors
+  - InvalidUserIDErr{userID}
+  - BalanceNotEnoughErr{userID, balance, amount}
+  - InvalidTypeErr{}
+  - TransactionErr{transID, reason}
+  - WriteLogFailErr{id, reason}
+  - WriteBlockFailErr{id, reason}
+  - BlockInvalidErr{id}
+  - ApplyInconsistentErr{}
+  - ServerInitErr{reason}
+  - DataMissingErr{}
+  - LogsInvalidErr{d, reason}

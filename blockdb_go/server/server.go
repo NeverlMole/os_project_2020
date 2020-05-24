@@ -3,6 +3,8 @@ package server
 import (
 	"golang.org/x/net/context"
   "log"
+  "sync"
+  "fmt"
 
 	pb "blockdb_go/protobuf/go"
   log_pb "blockdb_go/log_protobuf/go"
@@ -18,6 +20,7 @@ type Server struct {
   orderNum int32
   blockSize int32
   blockNum int32
+  mux sync.Mutex
   curStates *account.AccountStates
   curLog []*log_pb.Transaction
   logHelper *util.LogHelper
@@ -106,7 +109,30 @@ func (s *Server) CheckFlushLog() error {
   return nil
 }
 
-func (s *Server) Apply(trans *log_pb.Transaction) (bool, error) {
+func (s *Server) Apply(trans *log_pb.Transaction) (result bool, ret_err error) {
+  s.mux.Lock()
+  defer func () {
+    trans_str, err := util.ProtobufToString(trans)
+    if err != nil {
+      log.Fatalf("Trans constructed invalid !!!!")
+    }
+    trans_str = "Transaction " + trans_str
+    if result {
+      trans_str = trans_str + " added successfully."
+    } else {
+      trans_str = trans_str + fmt.Sprintf(" failed with error: %v", ret_err)
+    }
+    log.Println(trans_str)
+
+   // if _, ok := ret_err.(TransactionErr); ok {
+   //   ret_err = nil
+   // }
+
+    s.mux.Unlock()
+  }()
+
+  //log.Println(*trans)
+
   s.transNum++
   trans.TransID = s.transNum
   if err := s.curStates.Check(trans); err != nil {
@@ -115,13 +141,13 @@ func (s *Server) Apply(trans *log_pb.Transaction) (bool, error) {
 
   // Apply check succeed and start to update the log.
   if err := s.CheckFlushLog(); err != nil {
-    return false, secure.NewTransactionErr(trans.TransID, err)
+    return false, err
   }
 
   trans.OrderID = s.orderNum + 1
 
   if err := s.logHelper.WriteLog(int32(len(s.curLog)) + 1, trans); err != nil {
-    return false, secure.NewTransactionErr(trans.TransID, err)
+    return false, err
   }
 
   if err := s.curStates.Apply(trans); err != nil {
@@ -134,48 +160,50 @@ func (s *Server) Apply(trans *log_pb.Transaction) (bool, error) {
 
 /************************-Database Interface-*****************************/
 func (s *Server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetResponse, error) {
-  value, err := s.curStates.Get(in.UserID)
-  if err != nil {
-    err = secure.NewUserGetErr(err)
-  }
-  return &pb.GetResponse{Value: value}, err
+  s.mux.Lock()
+  defer s.mux.Unlock()
+
+  value, _ := s.curStates.Get(in.UserID)
+  return &pb.GetResponse{Value: value}, nil
 }
 
 func (s *Server) Put(ctx context.Context, in *pb.Request) (*pb.BooleanResponse, error) {
   trans := &log_pb.Transaction{Type: log_pb.Transaction_PUT,
-                              UserID: in.UserID,
-                              Value: in.Value}
-  result, err := s.Apply(trans)
-	return &pb.BooleanResponse{Success: result}, err
+                               UserID: in.UserID,
+                               Value: in.Value}
+  result, _ := s.Apply(trans)
+	return &pb.BooleanResponse{Success: result}, nil
 }
 
 func (s *Server) Deposit(ctx context.Context, in *pb.Request) (*pb.BooleanResponse, error) {
   trans := &log_pb.Transaction{Type: log_pb.Transaction_DEPOSIT,
-                              UserID: in.UserID,
-                              Value: in.Value}
-  result, err := s.Apply(trans)
-	return &pb.BooleanResponse{Success: result}, err
+                               UserID: in.UserID,
+                               Value: in.Value}
+  result, _ := s.Apply(trans)
+	return &pb.BooleanResponse{Success: result}, nil
 }
 
 func (s *Server) Withdraw(ctx context.Context, in *pb.Request) (*pb.BooleanResponse, error) {
   trans := &log_pb.Transaction{Type: log_pb.Transaction_WITHDRAW,
-                              UserID: in.UserID,
-                              Value: in.Value}
-  result, err := s.Apply(trans)
-	return &pb.BooleanResponse{Success: result}, err
+                               UserID: in.UserID,
+                               Value: in.Value}
+  result, _ := s.Apply(trans)
+	return &pb.BooleanResponse{Success: result}, nil
 }
 
 func (s *Server) Transfer(ctx context.Context, in *pb.TransferRequest) (*pb.BooleanResponse, error) {
   trans := &log_pb.Transaction{Type: log_pb.Transaction_TRANSFER,
-                              FromID: in.FromID,
-                              ToID: in.ToID,
-                              Value: in.Value}
-  result, err := s.Apply(trans)
-	return &pb.BooleanResponse{Success: result}, err
+                               FromID: in.FromID,
+                               ToID: in.ToID,
+                               Value: in.Value}
+  result, _ := s.Apply(trans)
+	return &pb.BooleanResponse{Success: result}, nil
 }
 
 // Interface with test grader
 func (s *Server) LogLength(ctx context.Context, in *pb.Null) (*pb.GetResponse, error) {
+  s.mux.Lock()
+  defer s.mux.Unlock()
 	return &pb.GetResponse{Value: int32(len(s.curLog))}, nil
 }
 
