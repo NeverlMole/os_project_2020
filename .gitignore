@@ -6,6 +6,7 @@ nachos/proj2/*
 *.o
 *.sum
 *.mod
-blockdb/vendor/*
-blockdb/main/main
-blockdb/tmp/*
+blockdb_go/vendor/*
+blockdb_go/main/main
+blockdb_go/tmp/*
+blockdb_go/example_test/*

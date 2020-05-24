@@ -7,8 +7,8 @@ import (
 	"log"
 	"net"
 
-	pb "blockdb/protobuf/go"
-  "blockdb/server"
+	pb "blockdb_go/protobuf/go"
+  "blockdb_go/server"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -43,7 +43,9 @@ func main() {
 
 	// Create gRPC server
 	s := grpc.NewServer()
-	pb.RegisterBlockDatabaseServer(s, server.New(outputDir, blockSize))
+  dbserver := server.New(outputDir, blockSize)
+  dbserver.Init()
+	pb.RegisterBlockDatabaseServer(s, dbserver)
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
 	// Start server
