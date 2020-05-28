@@ -126,6 +126,9 @@ github URL: https://github.com/NeverlMole/os_project_2020
   Since TA had given some test cases, we only tested several cases that didn't
   checked by TA's tests.
 
+  All the test cases should be run with the assumption that no server is
+  running.
+
   - Recovery test in test_rec.go
       : An client calls the server to run a set of random operations and it
         compute the correct result itself.
@@ -138,8 +141,8 @@ github URL: https://github.com/NeverlMole/os_project_2020
       : A client "company" constantly deposite money to an account "emp".
       : Several clients constantly transfer money from account "emp"
         to account "game".
-      : The client "company" checks whether the sum of "emp" and "kejing" are
-        equals to the money it deposite.
+      : The client "company" checks whether the value of "game" is equal to
+        the money it deposite when the value of "emp" is 0.
       : The purpose of the test is to test whether the server can handle the
         concurrent client requests.
 

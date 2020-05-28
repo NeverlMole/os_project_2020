@@ -1,7 +1,5 @@
 package main
 
-// Test 1: return value check and invalid transaction rejection
-
 import (
 	"encoding/json"
 	"fmt"
@@ -117,8 +115,6 @@ func main() {
  // err := cmd.Start()
  // check(err, "clean data")
 
-  fmt.Println("Clean start.")
-
   c_stop := make(chan int)
 
 	var wg sync.WaitGroup
@@ -148,8 +144,6 @@ func main() {
   uid := "NONEXIST"
 
   init_value := mustGet(uid)
-	//Default value for a new account is expected to be 0.
-  fmt.Println("Clean t.")
 
   for i := 1; i <= 400; i++ {
     mustDeposit(uid, 1)
