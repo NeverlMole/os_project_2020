@@ -7,3 +7,6 @@
     $ ./compile.sh
   - To run the server
     $ ./start.sh
+
+. To run the test
+  $ go run ./test/test_name.go

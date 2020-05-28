@@ -1,4 +1,9 @@
-. Transaction Structure
+github URL: https://github.com/NeverlMole/os_project_2020
+!!!!!!!!!!!!!!!  The project three is in blockdb_go directory !!!!!!!!!!!!!!!!!
+
+. To run the server and test see blockdb_go/README
+
+. Transaction Structure in blockdb_go/log_protobuf
   Struct values:
     - TransID
         : Indicate the transaction number. The i-th transaction should have
@@ -12,7 +17,7 @@
     - FromID
     - ToID
 
-. Log Package
+. util Package in blockdb_go/util
 
   Major functions:
     - ReadBlock()
@@ -38,7 +43,7 @@
     - CleanLogs()
         : Remove all the logs in the disk in an decreasing order.
 
-. AccountStates Structure
+. AccountStates Structure in blockdb_go/account
   When a new user id is asked, create a new term in map with value 0. If a
   user id is invalid, directly return an error.
 
@@ -58,12 +63,11 @@
           valid.
         : Return the balance of an given account.
 
-. Server Package
+. Server Structure in blockdb_go/server
 
   Member variables:
     - curStates AccountStates
-    - curLog list of Transactions
-    - logLength
+    - curLog []*Transactions
 
   Major public member functions:
     - Init()
@@ -100,13 +104,12 @@
     - Other operation {Put, Deposit, ...}
         : Generate a transaction accordingly and run Apply().
 
-. The main function main()
+. The main function main() in blockdb_go/main
   : Read the information from config.json.
   : Create and init a server.
   : Start the server.
 
-
-. Errors
+. Errors in blockdb_go/secure
   - InvalidUserIDErr{userID}
   - BalanceNotEnoughErr{userID, balance, amount}
   - InvalidTypeErr{}
@@ -118,3 +121,36 @@
   - ServerInitErr{reason}
   - DataMissingErr{}
   - LogsInvalidErr{d, reason}
+
+. Test cases in blockdb_go/test
+  Since TA had given some test cases, we only tested several cases that didn't
+  checked by TA's tests.
+
+  - Recovery test in test_rec.go
+      : An client calls the server to run a set of random operations and it
+        compute the correct result itself.
+      : The server will crash frequently by direct killing the server.
+      : Check whether the answer is always correct.
+      : The purpose of the test is to test whether the recovery work for
+        the server crash failure.
+
+  - Concurrent test in test_con.go
+      : A client "company" constantly deposite money to an account "emp".
+      : Several clients constantly transfer money from account "emp"
+        to account "game".
+      : The client "company" checks whether the sum of "emp" and "kejing" are
+        equals to the money it deposite.
+      : The purpose of the test is to test whether the server can handle the
+        concurrent client requests.
+
+  - Data missing test in test_missing.go
+      : We prepare a set of good recover data with logs and block by run 103
+        operations and restart the server after deleting several files in the
+        data as the following ways:
+          - Remove block 1.
+          - Remove block 2.
+          - Change the block 1.
+          - Change the block 2.
+      : All the cases should result in the server failure.
+      : The purpose of the test is to test whether the server will crash if
+        some data is missing.
