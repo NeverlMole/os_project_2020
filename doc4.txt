@@ -1,0 +1,223 @@
+github URL: https://github.com/NeverlMole/os_project_2020
+!!!!!!!!!!!!!!!  The project four is in blockchaindb directory !!!!!!!!!!!!!!!!!
+
+. To run the server and test see blockchaindb/README
+
+. Miner Structure in blockchaindb/miner
+  The Miner Structure is used to do mining assignments. Each Miner is has an
+  corresponding serverID representing its server and a list of servers to which
+  the mined blocks are broadcasted. The server could use Start() to start a new
+  mining assignment and use Stop() to stop the assignment. Also, the miner will
+  automaticly stop and broadcasts the block when the block is successfully
+  mined.
+
+  Member variables:
+    - serverID string
+    - isMining bool
+    - miner_stop chan
+    - serverList []string
+
+  Major member functions:
+    - New(config):
+        : Init the serverID, isMining and serverList. The serverList should
+          contains all servers.
+
+    - Start(transactions, preBlock)
+        : If isMining is true, panic.
+        : Make a new channel for miner_stop
+        : Start to run Mining(transactions, preBlock, miner_stop) in another
+          goroutine.
+        : Set isMining to true.
+
+    - IsMining()
+        : Return isRunning.
+
+    - Stop()
+        : If isMining is false, return.
+        : Send an message to miner_stop.
+        : Set isMining to false.
+
+    - Mining(transactions, preBlock, miner_stop)
+        : Constantly try to create an block according to transactions, preBlock
+          and serverID.
+        : Each time if fail, check whether there are message from miner_stop.
+          If so, return. Otherwise, continue mining.
+        : If a correct block is found, push the block to all the servers and
+          return.
+
+. client Package in blockchaindb/client
+  client package provides convinient interface to do client operation such as
+  PushTransaction and GetBlock.
+
+  Major member functions:
+    - ClientPushTransaction(serverList, transaction)
+        : Push the transaction to each server in the serverList.
+
+    - ClientPushBlock(serverList, block)
+        : Push block to each server in the serverList.
+
+    - ClientGetBlock(serverList, hash)
+        : Get the blocks by hash from all servers in the serverList. Return all
+          the blocks successfully get.
+
+    - ClientGetCurBlock(serverList)
+        : Get the curBlock from all servers in the serverList. Return all the
+          blocks successfully get.
+
+. AccountStates Structure in blockchaindb/account
+  When a new user id is asked, create a new term in map with value 1000. If a
+  user id is invalid, directly return an error.
+
+  Member variables:
+    - data map[string]int32
+        : A map with user id as key and account balance as value.
+        : Initially empty.
+
+  Member functions:
+    - Apply(transaction)
+        : Apply a transaction accordingly.
+        : Return error if not succeed.
+    - Check(transaction)
+        : Similar to apply but does not apply the transaction.
+    - Get(userID)
+        : Check whether the userID is valid. Return InvalidUserIDErr if not
+          valid.
+        : Return the balance of an given account.
+
+. BlockMap Structure in blockchaindb/blocks
+  The BlockMap Structure is used to deal with the adding and retrieving blocks.
+  It doesn't check the validness of a block but just served as a simple file
+  system. AddBlock() function can add a block. GetBlock() function can retrieve
+  a block if it was added. Additionaly, BlockMap provides a convinient
+  interface GetBlockStates() to get the account states given a stored block
+  representing the corresponding branch.
+
+  Member vairables:
+    - outputDir string
+    - storedMap map[string]bool
+
+  Member functions:
+    - AddBlock(block)
+        : Return err if the block exists in storedMap.
+        : Set the storedMap[block.hash] to true.
+        : Write the block to outputDir.
+        : Return the error if any.
+
+    - GetBlock(hash)
+        : Return nil if the block is not stored.
+        : Otherwise, return the block.
+
+    - GetBlockStates(hash)
+        : If the block corresponding to hash is not stored, return err.
+        : Read the whole chain of blocks starting from the given block and
+          apply all the transactions in the chain to get account states.
+        : If no error occurs, return the account states. Otherwise, return the
+          error.
+
+. Server Structure in blockchaindb/server
+
+  Member variables:
+    - curStates *AccountStates
+    - confirmedStates *AccountStates
+    - blockMap *BlockMap
+    - pendingTrans []*Transactions
+    - curBlock *Block
+    - miner *Miner
+    - serverList []string
+
+  Implementation of the interface:
+    - Get()
+        : Return the information from confirmedStates.
+
+    - Transfer(transaction)
+        : Run Apply(transaction). Return if not succeed.
+        : Push the transaction to other servers using ClientPushTransaction.
+        : Return succeed if no error occurs.
+
+    - Verify(transaction)
+        : Try to find transaction in pendingTrans. If find, return PENDING.
+        : Try to find transaction in the branch of curBlock. If find in the
+          latest 6 blocks, return PENDING. If find later, return CONFIRMED.
+        : Otherwise return FAILED.
+
+    - GetHeight()
+        : Return the id of curBlock.
+
+    - GetBlock(hash)
+        : Return the block from blockMap.
+
+    - GetCurBlock()
+        : Return the curBlock.
+
+    - PushTransaction(transaction)
+        : Run Apply(transaction)
+
+    - PushBlock(block)
+        : If the block does not lead to a better branch than curBlock, return.
+        : Try to add the block by running UpdateBranch(block).
+        : If succeed, run InitBranch(block) to switch to the branch of the
+          block.
+
+  Major member functions:
+    - New(config)
+        : Initialize miner by runing miner.New(config).
+        : Init serverList which should contains all other servers.
+
+    - Init()
+        : Get all the curBlocks from servers in serverList by function
+          ClientGetCurBlock(). For each block, run UpdateBranch(block).
+        : Run InitBranch(bestBlock) where bestBlock is the latest block of the
+          longest branch.
+
+    - InitBranch(block)
+        : Check the block is in blockMap. If not, panic.
+        : Set curBlock to the block.
+        : Set pendingTrans to empty.
+        : Set curStates and confirmedStates using blockMap.GetBlockStates().
+        : Run miner.Stop().
+
+    - UpdateBranch(block)
+        : If the block is already in blockMap, return not success.
+        : Try to get a chain of blocks ends at the block from either blockMap
+          or other servers.
+            - If the block is not in blockMap, use ClientGetBlock to get all
+              possible block from other servers. Pick the block that appears
+              mostly. In most cases, we could assume all the block should be
+              the same because of the security of hash.
+            - If the block is in blockMap, then stop fetching the rest of block
+              and directly using the account state represented by the block
+              by blockMap.GetBlockStates().
+        : Check all the hash, blockID, and all the transactions are valid. If
+          the check is not passed, return not success.
+        : If the check is passed, add the whole chain of blocks to blockMap.
+          Return success.
+
+    - Apply(transaction)
+        : Try applying the transaction to the current states. Return not
+          succeed if the transaction is invalid.
+        : Add the transaction to pendingTrans.
+        : Run TryMining().
+
+    - TryMining()
+        : If the pendingTrans are not enough, return.
+        : Check whether the miner is already mining by running
+          miner.IsMining(). If the miner is mining, return.
+        : Run miner.Start(pendingTrans, curBlock).
+
+. The main function main() in blockchaindb/main
+  : Read the information from config.json.
+  : Create and init a server.
+  : Start the server.
+
+. Errors in blockdbchaindb/secure
+  - InvalidUserIDErr{userID}
+  - BalanceNotEnoughErr{userID, balance, amount}
+  - InvalidTypeErr{}
+  - TransactionErr{transID, reason}
+  - WriteLogFailErr{id, reason}
+  - WriteBlockFailErr{id, reason}
+  - BlockInvalidErr{id}
+  - ApplyInconsistentErr{}
+  - ServerInitErr{reason}
+  - DataMissingErr{}
+  - LogsInvalidErr{d, reason}
