@@ -14,7 +14,7 @@ github URL: https://github.com/NeverlMole/os_project_2020
   Member variables:
     - serverID string
     - isMining bool
-    - miner_stop chan
+    - minerStop chan
     - serverList []string
 
   Major member functions:
@@ -45,8 +45,8 @@ github URL: https://github.com/NeverlMole/os_project_2020
         : If a correct block is found, push the block to all the servers and
           return.
 
-. client Package in blockchaindb/client
-  client package provides convinient interface to do client operation such as
+. Client Package in blockchaindb/client
+  Client package provides convinient interface to do client operation such as
   PushTransaction and GetBlock.
 
   Major member functions:
@@ -130,8 +130,8 @@ github URL: https://github.com/NeverlMole/os_project_2020
         : Return the information from confirmedStates.
 
     - Transfer(transaction)
-        : Run Apply(transaction). Return if not succeed.
         : Push the transaction to other servers using ClientPushTransaction.
+        : Run Apply(transaction). Return if not succeed.
         : Return succeed if no error occurs.
 
     - Verify(transaction)
@@ -150,7 +150,7 @@ github URL: https://github.com/NeverlMole/os_project_2020
         : Return the curBlock.
 
     - PushTransaction(transaction)
-        : Run Apply(transaction)
+        : Run Apply(transaction).
 
     - PushBlock(block)
         : If the block does not lead to a better branch than curBlock, return.
@@ -196,13 +196,12 @@ github URL: https://github.com/NeverlMole/os_project_2020
         : Try applying the transaction to the current states. Return not
           succeed if the transaction is invalid.
         : Add the transaction to pendingTrans.
-        : Run TryMining().
 
     - TryMining()
-        : If the pendingTrans are not enough, return.
-        : Check whether the miner is already mining by running
-          miner.IsMining(). If the miner is mining, return.
-        : Run miner.Start(pendingTrans, curBlock).
+        : If pendingTrans is greater than blockSize, return.
+        : Stop the previous miner by miner.Stop().
+        : Start a new miner mission by running miner.Start(pendingTrans,
+          curBlock).
 
 . The main function main() in blockchaindb/main
   : Read the information from config.json.
@@ -210,14 +209,40 @@ github URL: https://github.com/NeverlMole/os_project_2020
   : Start the server.
 
 . Errors in blockdbchaindb/secure
+  - BlockMapBrokenErr{}
   - InvalidUserIDErr{userID}
   - BalanceNotEnoughErr{userID, balance, amount}
-  - InvalidTypeErr{}
-  - TransactionErr{transID, reason}
-  - WriteLogFailErr{id, reason}
-  - WriteBlockFailErr{id, reason}
-  - BlockInvalidErr{id}
-  - ApplyInconsistentErr{}
-  - ServerInitErr{reason}
-  - DataMissingErr{}
-  - LogsInvalidErr{d, reason}
+  - IntegrityConstrainErr{miningFee, value}
+  - TransactionErr{UUID, reason}
+  - InvalidBlockErr{hash, reason}
+  - AddBlockErr{reason}
+
+. Test cases in blockchaindb/test
+  All the test cases should be run with the assumption that no server is
+  running.
+
+  - Consistency test in test_con.go
+      : A client calls the server to run a set of random operations and it
+        compute the correct result itself.
+      : Check whether the datas are the same among the servers.
+      : The purpose of the test is to test the consistency of the servers.
+
+  - Recovery for crash test in test_rec.go
+      : A client calls the server to run a set of random operations and it
+        compute the correct result itself.
+      : An arbitrary server will crash frequently by direct killing the
+        server.
+      : Check whether the data are recoveried in this server, which should
+        be the same as the data in other ones.
+      : The purpose of the test is to test whether the recovery work for
+        the server crash failure.
+
+  - Byzantine failure test in test_byz.go
+      : A client calls the server to run a set of random operations and it
+        compute the correct result itself.
+      : Send few broadcast wrong random blocks (simulate wrong servers) to
+        all servers.
+      : Check whether the datas are correct and the same in servers, which
+        shouldn't be affected by wrong messages.
+      : The purpose of the test is to test whether the recovery work for
+        the server Byzantine failure.

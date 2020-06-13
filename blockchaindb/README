@@ -1,0 +1,12 @@
+. To compile or run the server
+  - First run the following commands to install the dependent packages.
+    $ go mod init blockchaindb
+    $ go mod tidy
+    $ go mod vendor
+  - Then run compile.sh
+    $ ./compile.sh
+  - To run the server with id n
+    $ ./start.sh --id=n
+
+. To run the test
+  $ go run ./test/test_name.go
